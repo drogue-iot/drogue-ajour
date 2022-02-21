@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: firmware-build
+spec:
+  steps:
+    - command:
+        - /bin/bash
+        - '-c'
+        - >-
+          cd $(workspaces.input.path)/firmware/application &&
+          ./.ci/build.sh
+      image: 'docker.io/lulf/firmware-builder:latest'
+      name: build
+      resources: {}
+  workspaces:
+    - description: Build directory
+      mountPath: /workspace
+      name: input

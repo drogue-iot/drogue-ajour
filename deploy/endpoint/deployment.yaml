@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firmware-endpoint
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: firmware-endpoint
+  template:
+    metadata:
+      labels:
+				app: firmware-endpoint
+    spec:
+      containers:
+      - name: endpoint
+        image: docker.io/lulf/firmware-endpoint:latest
+        ports:
+        - containerPort: 8080

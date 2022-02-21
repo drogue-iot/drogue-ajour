@@ -1,0 +1,60 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: oci-firmware
+spec:
+  params:
+    - default: 'https://github.com/drogue-iot/burrboard'
+      description: Firmware repository
+      name: GIT_REPO
+      type: string
+    - default: main
+      description: Revision
+      name: GIT_REVISION
+      type: string
+    - default: image-registry.openshift-image-registry.svc:5000/drogue-firmware/burrboard
+      description: Firmware image name
+      name: FIRMWARE_IMAGE
+      type: string
+  tasks:
+    - name: fetch-repository
+      params:
+        - name: url
+          value: $(params.GIT_REPO)
+        - name: revision
+          value: $(params.GIT_REVISION)
+        - name: deleteExisting
+          value: 'true'
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: build
+    - name: firmware-build
+      runAfter:
+        - fetch-repository
+      taskRef:
+        kind: Task
+        name: firmware-build
+      workspaces:
+        - name: input
+          workspace: build
+    - name: firmware-deploy
+      params:
+        - name: IMAGE
+          value: $(params.FIRMWARE_IMAGE)
+        - name: DOCKERFILE
+          value: $(workspaces.source.path)/firmware/application/Dockerfile
+        - name: CONTEXT
+          value: $(workspaces.source.path)/firmware/application
+      runAfter:
+        - firmware-build
+      taskRef:
+        kind: ClusterTask
+        name: buildah
+      workspaces:
+        - name: source
+          workspace: build
+  workspaces:
+    - name: build
