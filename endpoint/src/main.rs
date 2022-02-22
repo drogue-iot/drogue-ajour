@@ -26,11 +26,7 @@ pub struct FirmwareResponse {
 }
 
 #[get("/v1/poll/{image}")]
-async fn poll(
-    oci: web::Data<OciClient>,
-    token: web::Data<String>,
-    image: web::Path<String>,
-) -> impl Responder {
+async fn poll(oci: web::Data<OciClient>, image: web::Path<String>) -> impl Responder {
     let data = match oci.fetch_latest_metadata(&image).await {
         Ok(result) => Some(result),
         Err(e) => None,
@@ -58,6 +54,7 @@ async fn fetch(
 
 #[derive(Clone)]
 pub struct OciClient {
+    prefix: String,
     token: String,
     client: Arc<Mutex<client::Client>>,
 }
@@ -67,7 +64,7 @@ impl OciClient {
         let mut client = self.client.lock().unwrap();
         let manifest = client
             .fetch_manifest_digest(
-                &image.parse()?,
+                &format!("{}{}", self.prefix, image).parse()?,
                 &RegistryAuth::Basic("".to_string(), self.token.clone()),
             )
             .await;
@@ -98,18 +95,23 @@ async fn main() -> std::io::Result<()> {
         accept_invalid_certificates: true,
         extra_root_certificates: Vec::new(),
     })));
+    let prefix = std::env::var_os("REGISTRY_PREFIX")
+        .unwrap()
+        .into_string()
+        .unwrap();
     let token = std::env::var_os("REGISTRY_TOKEN")
         .unwrap()
         .into_string()
         .unwrap();
     HttpServer::new(move || {
         App::new()
-            .app_data(OciClient {
+            .app_data(web::Data::new(OciClient {
                 client: client.clone(),
                 token: token.clone(),
-            })
+                prefix: prefix.clone(),
+            }))
             .service(poll)
-            .service(fetch)
+        // .service(fetch)
     })
     .bind(("0.0.0.0", 8080))?
     .run()
