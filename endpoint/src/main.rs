@@ -1,6 +1,8 @@
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use anyhow::anyhow;
 use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -63,25 +65,26 @@ impl OciClient {
     pub async fn fetch_latest_metadata(&self, image: &str) -> Result<Metadata, anyhow::Error> {
         let mut client = self.client.lock().unwrap();
         let manifest = client
-            .fetch_manifest_digest(
+            .pull_manifest_and_config(
                 &format!("{}{}", self.prefix, image).parse()?,
                 &RegistryAuth::Basic("".to_string(), self.token.clone()),
             )
             .await;
         match manifest {
-            Ok(result) => {
-                log::info!("MANIFEST FETCH: {:?}", result);
+            Ok((_, _, config)) => {
+                let val: Value = serde_json::from_str(&config)?;
+                log::info!("value: {:?}", val);
+                log::info!("config: {:?}", val["config"]);
+                log::info!("Labels: {:?}", val["config"]["Labels"]);
+                if let Some(annotation) = val["config"]["Labels"]["io.drogue.metadata"].as_str() {
+                    let metadata: Metadata = serde_json::from_str(&annotation)?;
+                    Ok(metadata)
+                } else {
+                    Err(anyhow!("Unable to locate metadata in image config"))
+                }
             }
-            Err(e) => {
-                log::info!("MANIFEST FETCH ERR: {:?}", e);
-            }
+            Err(e) => Err(e),
         }
-        format!("Return metadata for image {}!", &image);
-        let metadata = Metadata {
-            version: "1234".to_string(),
-            size: "0".to_string(),
-        };
-        Ok(metadata)
     }
 }
 
@@ -90,7 +93,7 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     let client = Arc::new(Mutex::new(client::Client::new(client::ClientConfig {
-        protocol: client::ClientProtocol::Http,
+        protocol: client::ClientProtocol::Https,
         accept_invalid_hostnames: true,
         accept_invalid_certificates: true,
         extra_root_certificates: Vec::new(),

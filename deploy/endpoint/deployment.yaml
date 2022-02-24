@@ -10,10 +10,23 @@ spec:
   template:
     metadata:
       labels:
-				app: firmware-endpoint
+        app: firmware-endpoint
     spec:
       containers:
       - name: endpoint
         image: docker.io/lulf/firmware-endpoint:latest
+        env:
+          - name: RUST_LOG
+            value: debug
+          - name: REGISTRY_PREFIX
+            valueFrom:
+              secretKeyRef:
+                name: container-registry
+                key: prefix
+          - name: REGISTRY_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: container-registry
+                key: token
         ports:
         - containerPort: 8080
