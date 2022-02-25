@@ -35,7 +35,10 @@ pub struct Image(pub String);
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Version(pub String);
 
-#[get("/v1/poll/{image}")]
+async fn healthz() -> impl Responder {
+    HttpResponse::Ok().finish()
+}
+
 async fn poll(
     oci: web::Data<OciClient>,
     index: web::Data<Index>,
@@ -56,12 +59,9 @@ async fn poll(
     })
 }
 
-#[get("/v1/fetch/{image}/{version}")]
-async fn fetch(
-    oci: web::Data<OciClient>,
-    params: (web::Path<Image>, web::Path<Version>),
-) -> impl Responder {
-    let image_ref = format!("{}:{}", &params.0 .0, &params.1 .0);
+async fn fetch(oci: web::Data<OciClient>, path: web::Path<(Image, Version)>) -> impl Responder {
+    let (image, version) = path.into_inner();
+    let image_ref = format!("{}:{}", &image.0, &version.0);
     let metadata = oci.fetch_metadata(&image_ref).await;
     if let Ok(metadata) = metadata {
         let payload = oci.fetch_firmware(&image_ref).await;
@@ -125,7 +125,6 @@ impl OciClient {
         }
     }
 }
-
 #[derive(Clone)]
 pub struct Index {
     dir: PathBuf,
@@ -167,8 +166,9 @@ async fn main() -> std::io::Result<()> {
                 prefix: prefix.clone(),
             }))
             .app_data(web::Data::new(index.clone()))
-            .service(poll)
-            .service(fetch)
+            .route("/v1/poll/{image}", web::get().to(poll))
+            .route("/v1/fetch/{image}/{version}", web::get().to(fetch))
+            .route("/healthz", web::get().to(healthz))
     })
     .bind(("0.0.0.0", 8080))?
     .run()

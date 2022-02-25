@@ -19,6 +19,7 @@ spec:
       containers:
       - name: endpoint
         image: docker.io/lulf/firmware-endpoint:latest
+        imagePullPolicy: Always
         volumeMounts:
           - name: registry-index
             readOnly: true
@@ -40,3 +41,11 @@ spec:
                 key: token
         ports:
         - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
