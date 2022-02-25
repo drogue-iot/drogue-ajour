@@ -12,9 +12,13 @@ spec:
       description: Revision
       name: GIT_REVISION
       type: string
-    - default: image-registry.openshift-image-registry.svc:5000/drogue-firmware/burrboard
+    - default: image-registry.openshift-image-registry.svc:5000/drogue-firmware
       description: Firmware image name
-      name: FIRMWARE_IMAGE
+      name: REGISTRY
+      type: string
+    - default: burrboard
+      description: Firmware name
+      name: FIRMWARE_NAME
       type: string
   tasks:
     - name: fetch-repository
@@ -43,11 +47,13 @@ spec:
     - name: firmware-deploy
       params:
         - name: IMAGE
-          value: $(params.FIRMWARE_IMAGE)
+          value: $(params.REGISTRY)/$(params.FIRMWARE_NAME):$(tasks.firmware-build.results.revision)
         - name: DOCKERFILE
           value: $(workspaces.source.path)/firmware/application/Dockerfile
         - name: CONTEXT
           value: $(workspaces.source.path)/firmware/application
+        - name: BUILD_EXTRA_ARGS
+          value: --label io.drogue.metadata="`cat $(workspaces.source.path)/firmware/application/firmware.json`"
       runAfter:
         - firmware-build
       taskRef:
@@ -56,5 +62,16 @@ spec:
       workspaces:
         - name: source
           workspace: build
+    - name: registry-update
+      params:
+        - name: IMAGE
+          value: $(params.FIRMWARE_NAME)
+        - name: REVISION
+          value: $(tasks.firmware-build.results.revision)
+      runAfter:
+        - firmware-deploy
+      taskRef:
+        kind: Task
+        name: registry-update
   workspaces:
     - name: build

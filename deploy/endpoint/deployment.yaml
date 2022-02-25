@@ -12,10 +12,20 @@ spec:
       labels:
         app: firmware-endpoint
     spec:
+      volumes:
+        - name: registry-index
+          persistentVolumeClaim:
+            claimName: registry
       containers:
       - name: endpoint
         image: docker.io/lulf/firmware-endpoint:latest
+        volumeMounts:
+          - name: registry-index
+            readOnly: true
+            mountPath: /registry
         env:
+          - name: INDEX_DIR
+            value: /registry
           - name: RUST_LOG
             value: debug
           - name: REGISTRY_PREFIX

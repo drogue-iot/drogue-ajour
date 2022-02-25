@@ -9,10 +9,14 @@ spec:
         - '-c'
         - >-
           cd $(workspaces.input.path)/firmware/application &&
+          git rev-parse --short HEAD | tr -d '\n' > $(results.revision.path) &&
           ./.ci/build.sh
       image: 'docker.io/lulf/firmware-builder:latest'
       name: build
       resources: {}
+  results:
+    - name: revision
+      description: Git revision
   workspaces:
     - description: Build directory
       mountPath: /workspace
