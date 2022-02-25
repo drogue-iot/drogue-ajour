@@ -3,6 +3,8 @@ use anyhow::anyhow;
 use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -28,10 +30,19 @@ pub struct FirmwareResponse {
 }
 
 #[get("/v1/poll/{image}")]
-async fn poll(oci: web::Data<OciClient>, image: web::Path<String>) -> impl Responder {
-    let data = match oci.fetch_latest_metadata(&image).await {
-        Ok(result) => Some(result),
-        Err(e) => None,
+async fn poll(
+    oci: web::Data<OciClient>,
+    index: web::Data<Index>,
+    image: web::Path<String>,
+) -> impl Responder {
+    let data = if let Some(version) = index.latest_version(&image) {
+        let image_ref = format!("{}:{}", &image, &version);
+        match oci.fetch_metadata(&image_ref).await {
+            Ok(result) => Some(result),
+            Err(e) => None,
+        }
+    } else {
+        None
     };
     HttpResponse::Ok().json(PollResponse {
         current: data,
@@ -45,13 +56,20 @@ async fn fetch(
     image: web::Path<String>,
     version: web::Path<String>,
 ) -> impl Responder {
-    format!("Return metadata for image {}!", &image);
-    let metadata = Metadata {
-        version: version.to_string(),
-        size: "0".to_string(),
-    };
-    let payload = Vec::new();
-    HttpResponse::Ok().json(FirmwareResponse { metadata, payload })
+    let image_ref = format!("{}:{}", &image, &version);
+    let metadata = oci.fetch_metadata(&image_ref).await;
+    if let Ok(metadata) = metadata {
+        let payload = oci.fetch_firmware(&image_ref).await;
+        if let Ok(payload) = payload {
+            HttpResponse::Ok().json(FirmwareResponse { metadata, payload })
+        } else {
+            log::info!("Error fetching firmware for {}", image_ref);
+            HttpResponse::NotFound().finish()
+        }
+    } else {
+        log::info!("Error fetching metadata for {}", image_ref);
+        HttpResponse::NotFound().finish()
+    }
 }
 
 #[derive(Clone)]
@@ -62,7 +80,7 @@ pub struct OciClient {
 }
 
 impl OciClient {
-    pub async fn fetch_latest_metadata(&self, image: &str) -> Result<Metadata, anyhow::Error> {
+    pub async fn fetch_metadata(&self, image: &str) -> Result<Metadata, anyhow::Error> {
         let mut client = self.client.lock().unwrap();
         let manifest = client
             .pull_manifest_and_config(
@@ -73,9 +91,6 @@ impl OciClient {
         match manifest {
             Ok((_, _, config)) => {
                 let val: Value = serde_json::from_str(&config)?;
-                log::info!("value: {:?}", val);
-                log::info!("config: {:?}", val["config"]);
-                log::info!("Labels: {:?}", val["config"]["Labels"]);
                 if let Some(annotation) = val["config"]["Labels"]["io.drogue.metadata"].as_str() {
                     let metadata: Metadata = serde_json::from_str(&annotation)?;
                     Ok(metadata)
@@ -84,6 +99,43 @@ impl OciClient {
                 }
             }
             Err(e) => Err(e),
+        }
+    }
+
+    pub async fn fetch_firmware(&self, image: &str) -> Result<Vec<u8>, anyhow::Error> {
+        let mut client = self.client.lock().unwrap();
+        let manifest = client
+            .pull(
+                &format!("{}{}", self.prefix, image).parse()?,
+                &RegistryAuth::Basic("".to_string(), self.token.clone()),
+                vec!["application/vnd.oci.image.layer.v1.tar"],
+            )
+            .await;
+        match manifest {
+            Ok(image) => {
+                log::info!("Received image with {} layers", image.layers.len());
+                Ok(Vec::new())
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Index {
+    dir: PathBuf,
+}
+
+impl Index {
+    pub fn new(dir: PathBuf) -> Self {
+        Self { dir }
+    }
+    pub fn latest_version(&self, image: &str) -> Option<String> {
+        let content = std::fs::read_to_string(format!("{}/{}/latest", self.dir.to_str()?, image));
+        if let Ok(r) = content {
+            Some(r)
+        } else {
+            None
         }
     }
 }
@@ -98,14 +150,10 @@ async fn main() -> std::io::Result<()> {
         accept_invalid_certificates: true,
         extra_root_certificates: Vec::new(),
     })));
-    let prefix = std::env::var_os("REGISTRY_PREFIX")
-        .unwrap()
-        .into_string()
-        .unwrap();
-    let token = std::env::var_os("REGISTRY_TOKEN")
-        .unwrap()
-        .into_string()
-        .unwrap();
+    let index_dir = std::env::var("INDEX_DIR").unwrap_or("/registry/".to_string());
+    let index = Index::new(PathBuf::from_str(&index_dir).unwrap());
+    let prefix = std::env::var("REGISTRY_PREFIX").unwrap();
+    let token = std::env::var("REGISTRY_TOKEN").unwrap();
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(OciClient {
@@ -113,8 +161,9 @@ async fn main() -> std::io::Result<()> {
                 token: token.clone(),
                 prefix: prefix.clone(),
             }))
+            .app_data(web::Data::new(index.clone()))
             .service(poll)
-        // .service(fetch)
+            .service(fetch)
     })
     .bind(("0.0.0.0", 8080))?
     .run()
