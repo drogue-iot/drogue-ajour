@@ -3,6 +3,7 @@ use anyhow::anyhow;
 use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::io::Read;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -65,11 +66,12 @@ async fn fetch(oci: web::Data<OciClient>, path: web::Path<(Image, Version)>) -> 
     let metadata = oci.fetch_metadata(&image_ref).await;
     if let Ok(metadata) = metadata {
         let payload = oci.fetch_firmware(&image_ref).await;
-        if let Ok(payload) = payload {
-            HttpResponse::Ok().json(FirmwareResponse { metadata, payload })
-        } else {
-            log::info!("Error fetching firmware for {}", image_ref);
-            HttpResponse::NotFound().finish()
+        match payload {
+            Ok(payload) => HttpResponse::Ok().json(FirmwareResponse { metadata, payload }),
+            Err(e) => {
+                log::info!("Error fetching firmware for {}: {:?}", image_ref, e);
+                HttpResponse::NotFound().finish()
+            }
         }
     } else {
         log::info!("Error fetching metadata for {}", image_ref);
@@ -113,13 +115,34 @@ impl OciClient {
             .pull(
                 &format!("{}{}", self.prefix, image).parse()?,
                 &RegistryAuth::Basic("".to_string(), self.token.clone()),
-                vec!["application/vnd.oci.image.layer.v1.tar"],
+                vec!["application/vnd.oci.image.layer.v1.tar+gzip"],
             )
             .await;
         match manifest {
             Ok(image) => {
-                log::info!("Received image with {} layers", image.layers.len());
-                Ok(Vec::new())
+                let layer = &image.layers[0];
+                let mut decompressed = Vec::new();
+                let mut d = flate2::read::GzDecoder::new(&layer.data[..]);
+                d.read_to_end(&mut decompressed)?;
+
+                let mut archive = tar::Archive::new(&decompressed[..]);
+                let mut entries = archive.entries()?;
+                loop {
+                    if let Some(entry) = entries.next() {
+                        let mut entry = entry?;
+                        let path = entry.path()?;
+                        if let Some(p) = path.to_str() {
+                            if p == "firmware" {
+                                let mut payload = Vec::new();
+                                entry.read_to_end(&mut payload)?;
+                                return Ok(payload);
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                Err(anyhow!("Error locating firmware"))
             }
             Err(e) => Err(e),
         }
