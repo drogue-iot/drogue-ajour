@@ -49,7 +49,10 @@ async fn poll(
         let image_ref = format!("{}:{}", &image.0, &version);
         match oci.fetch_metadata(&image_ref).await {
             Ok(result) => Some(result),
-            Err(e) => None,
+            Err(e) => {
+                log::info!("Error during metadata fetch: {:?}", e);
+                None
+            }
         }
     } else {
         None
@@ -67,7 +70,7 @@ async fn fetch(oci: web::Data<OciClient>, path: web::Path<(Image, Version)>) -> 
     if let Ok(metadata) = metadata {
         let payload = oci.fetch_firmware(&image_ref).await;
         match payload {
-            Ok(payload) => HttpResponse::Ok().json(FirmwareResponse { metadata, payload }),
+            Ok(payload) => HttpResponse::Ok().body(payload),
             Err(e) => {
                 log::info!("Error fetching firmware for {}: {:?}", image_ref, e);
                 HttpResponse::NotFound().finish()
