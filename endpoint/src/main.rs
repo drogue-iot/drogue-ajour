@@ -29,14 +29,20 @@ pub struct FirmwareResponse {
     pub payload: Vec<u8>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Image(pub String);
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Version(pub String);
+
 #[get("/v1/poll/{image}")]
 async fn poll(
     oci: web::Data<OciClient>,
     index: web::Data<Index>,
-    image: web::Path<String>,
+    image: web::Path<Image>,
 ) -> impl Responder {
-    let data = if let Some(version) = index.latest_version(&image) {
-        let image_ref = format!("{}:{}", &image, &version);
+    let data = if let Some(version) = index.latest_version(&image.0) {
+        let image_ref = format!("{}:{}", &image.0, &version);
         match oci.fetch_metadata(&image_ref).await {
             Ok(result) => Some(result),
             Err(e) => None,
@@ -53,10 +59,9 @@ async fn poll(
 #[get("/v1/fetch/{image}/{version}")]
 async fn fetch(
     oci: web::Data<OciClient>,
-    image: web::Path<String>,
-    version: web::Path<String>,
+    params: (web::Path<Image>, web::Path<Version>),
 ) -> impl Responder {
-    let image_ref = format!("{}:{}", &image, &version);
+    let image_ref = format!("{}:{}", &params.0 .0, &params.1 .0);
     let metadata = oci.fetch_metadata(&image_ref).await;
     if let Ok(metadata) = metadata {
         let payload = oci.fetch_firmware(&image_ref).await;
