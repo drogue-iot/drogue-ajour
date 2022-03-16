@@ -10,7 +10,7 @@ The fleet manager uses the Drogue IoT Cloud event stream and command API to comm
 
 An Open Container Initiative (OCI) registry is used to store images containing the device firmware. This allows reusing existing infrastructure commonly used in Kubernetes. 
 
-Building and deploying firmware to the OCI registry is decoupled from the fleet manager, as long as the expected manifest is part of the container image. As a reference architecture, fleet manager uses [tekton](tekton.dev) pipelines to build firmware.
+Building and deploying firmware to the OCI registry is decoupled from the fleet manager, as long as the expected manifest is part of the container image. As a reference architecture, fleet manager uses [tekton](tekton.dev) pipelines to build firmware, and a SQL database for storing an index of image versions and their location.
 
 ```
 +--------+          +------------------+          +---------------+ 
