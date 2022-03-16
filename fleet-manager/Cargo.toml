@@ -1,13 +1,17 @@
 [package]
-name = "drogue-firmware-endpoint"
+name = "drogue-fleet-manager"
 version = "0.1.0"
 edition = "2021"
+description = "A cloud native firmware management service"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix-web = "4.0.0-rc.3"
+actix-web = "4"
+clap = { version = "3.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "*"
+tungstenite = "*"
 serde = {version = "1", features = ["derive"] }
 serde_json = "1"
 oci-distribution = "0.8"
@@ -16,3 +20,4 @@ log = "0.4"
 env_logger = "0.9"
 tar = "0.4"
 flate2 = "1"
+base64 = "0.13.0"
