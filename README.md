@@ -12,7 +12,7 @@ An Open Container Initiative (OCI) registry is used to store images containing t
 
 Building and deploying firmware to the OCI registry is decoupled from the fleet manager, as long as the expected manifest is part of the container image. As a reference architecture, fleet manager uses [tekton](tekton.dev) pipelines to build firmware, and a local file database for storing an index of image versions that are built (expect this to move to some kind of SQL database eventually). 
 
-At present, only the 'latest' built version will be served. In the future, additional metadata to the Drogue IoT Application and Device types will make it possible to select the firmware version to serve.
+NOTE: At present, only the 'latest' built version will be served. In the future, additional metadata to the Drogue IoT Application and Device types will make it possible to select the firmware version to serve.
 
 ```
 +----------------+          +------------------+          +---------------+ 
@@ -36,6 +36,8 @@ At present, only the 'latest' built version will be served. In the future, addit
 The fleet manager uses a custom application level protocol sent on the 'dfu' channel and 'dfu' command to communicate with a device or gateway. The protocol is stateless, meaning the fleet manager will track only send out firmware updates to devices that are requesting the fleet manager to sync them.
 
 The protocol is designed so that devices do not have to be online continuously during the update, but can consume firmware at their own pace.
+
+The protocol uses Consise Binary Object Representation (CBOR), to ensure a small message size that works well with embedded devices. For descriptive purposes, the examples here are provided in JSON, with CBOR values to follow once implementation has started.
 
 A typical firmware update cycle runs as follows:
 
