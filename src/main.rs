@@ -1,5 +1,6 @@
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Context};
+use awc::{ws, Client};
 use clap::{Parser, Subcommand};
 use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
@@ -9,8 +10,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::Mutex;
-use tokio_tungstenite::connect_async;
-use tungstenite::http::Request;
 
 #[derive(Serialize, Deserialize)]
 pub struct PollResponse {
@@ -43,6 +42,7 @@ async fn healthz() -> impl Responder {
     HttpResponse::Ok().finish()
 }
 
+/*
 async fn poll(
     oci: web::Data<OciClient>,
     index: web::Data<Index>,
@@ -84,22 +84,29 @@ async fn fetch(oci: web::Data<OciClient>, path: web::Path<(Image, Version)>) -> 
         HttpResponse::NotFound().finish()
     }
 }
+*/
 
-#[derive(Clone)]
 pub struct OciClient {
     prefix: String,
-    token: String,
-    client: Arc<Mutex<client::Client>>,
+    auth: RegistryAuth,
+    client: client::Client,
 }
 
 impl OciClient {
-    pub async fn fetch_metadata(&self, image: &str) -> Result<Metadata, anyhow::Error> {
-        let mut client = self.client.lock().unwrap();
-        let manifest = client
-            .pull_manifest_and_config(
-                &format!("{}{}", self.prefix, image).parse()?,
-                &RegistryAuth::Basic("".to_string(), self.token.clone()),
-            )
+    pub fn new(client: client::Client, prefix: String, token: Option<String>) -> Self {
+        Self {
+            client,
+            prefix,
+            auth: token
+                .map(|t| RegistryAuth::Basic("".to_string(), t))
+                .unwrap_or(RegistryAuth::Anonymous),
+        }
+    }
+
+    pub async fn fetch_metadata(&mut self, image: &str) -> Result<Metadata, anyhow::Error> {
+        let manifest = self
+            .client
+            .pull_manifest_and_config(&format!("{}{}", self.prefix, image).parse()?, &self.auth)
             .await;
         match manifest {
             Ok((_, _, config)) => {
@@ -115,12 +122,12 @@ impl OciClient {
         }
     }
 
-    pub async fn fetch_firmware(&self, image: &str) -> Result<Vec<u8>, anyhow::Error> {
-        let mut client = self.client.lock().unwrap();
-        let manifest = client
+    pub async fn fetch_firmware(&mut self, image: &str) -> Result<Vec<u8>, anyhow::Error> {
+        let manifest = self
+            .client
             .pull(
                 &format!("{}{}", self.prefix, image).parse()?,
-                &RegistryAuth::Basic("".to_string(), self.token.clone()),
+                &self.auth,
                 vec!["application/vnd.oci.image.layer.v1.tar+gzip"],
             )
             .await;
@@ -176,23 +183,27 @@ impl Index {
 #[derive(Parser, Debug)]
 struct Args {
     /// Directory where firmware index is stored
-    #[clap(short, long, default_value = "/registry")]
+    #[clap(long, default_value = "/registry")]
     index_dir: PathBuf,
 
     /// Prefix to use for container registry storing images
-    #[clap(short, long)]
+    #[clap(long)]
     registry_prefix: String,
 
+    /// Token to use for authenticating to registry
+    #[clap(long)]
+    registry_token: Option<String>,
+
     /// URL to websocket endpoint for application
-    #[clap(short, long)]
-    url: String,
+    #[clap(long)]
+    websocket_url: String,
 
     /// Token for authenticating fleet manager to Drogue IoT
-    #[clap(short, long)]
+    #[clap(long)]
     token: String,
 
     /// Username for authenticating fleet manager to Drogue IoT
-    #[clap(short, long)]
+    #[clap(long)]
     user: String,
 }
 
@@ -201,48 +212,49 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     env_logger::init();
 
-    let client = Arc::new(Mutex::new(client::Client::new(client::ClientConfig {
+    let oci_client = client::Client::new(client::ClientConfig {
         protocol: client::ClientProtocol::Https,
         accept_invalid_hostnames: true,
         accept_invalid_certificates: true,
         extra_root_certificates: Vec::new(),
-    })));
+    });
+
     let index_dir = args.index_dir;
     let index = Index::new(index_dir);
-    let url = args.url;
+    let url = args.websocket_url;
     let token = args.token;
     let user = args.user;
 
     let encoded = base64::encode(&format!("{}:{}", user, token).as_bytes());
     let basic_header = format!("Basic {}", encoded);
 
-    let request = Request::builder()
-        .uri(url)
-        .header(tungstenite::http::header::AUTHORIZATION, basic_header)
-        .body(())
-        .context("Error building websocket request")?;
-
-    log::debug!("Connecting to websocket with request : {:?}", request);
-    let (mut socket, response) = connect_async(request)
+    let (response, mut connection) = Client::new()
+        .ws(url)
+        .set_header("Authorization", basic_header)
+        .connect()
         .await
-        .context("Error connecting to the websocket endpoint:")?;
-    log::debug!("HTTP response: {}", response.status());
+        .unwrap();
+
+    //    let response = connection.next().await.unwrap().unwrap();
+
+    log::info!("HTTP response: {}", response.status());
 
     //let prefix = arstd::env::var("REGISTRY_PREFIX").unwrap();
     //let token = std::env::var("REGISTRY_TOKEN").unwrap();
+    let oci = OciClient::new(
+        oci_client,
+        args.registry_prefix.clone(),
+        args.registry_token.clone(),
+    );
+
     HttpServer::new(move || {
         App::new()
-            /*     .app_data(web::Data::new(OciClient {
-                client: client.clone(),
-                token: token.clone(),
-                prefix: prefix.clone(),
-            }))
-            .app_data(web::Data::new(index.clone()))
+            /*     .app_data(web::Data::new(            .app_data(web::Data::new(index.clone()))
             .route("/v1/poll/{image}", web::get().to(poll))
             .route("/v1/fetch/{image}/{version}", web::get().to(fetch))*/
             .route("/healthz", web::get().to(healthz))
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind(("0.0.0.0", 12346))?
     .run()
     .await?;
     Ok(())
