@@ -13,9 +13,18 @@ An Open Container Initiative (OCI) registry is used to store images containing t
 Building and deploying firmware to the OCI registry is decoupled from the fleet manager, as long as the expected manifest is part of the container image. As a reference architecture, fleet manager uses [tekton](tekton.dev) pipelines to build firmware.
 
 ```
-+--------+          +------------------+          +---------------+          +--------------+          +-------------------------+
-|        | -------> |                  | -------> |               | -------> |              |          |                         |
-| Device |          | Drogue IoT Cloud |          | Fleet Manager |          | OCI Registry | <------- | Firmware Build Pipeline |
-|        | <------- |                  | <------- |               | <------- |              |          |                         |
-+--------+          +------------------+          +---------------+          +--------------+          +-------------------------+
++--------+          +------------------+          +---------------+ 
+|        | -------> |                  | -------> |               | 
+| Device |          | Drogue IoT Cloud |          | Fleet Manager | 
+|        | <------- |                  | <------- |               | 
++--------+          +------------------+          +---------------+ 
+                                                          |
+                                                          |
+                                                          |
+                                                          |
+              +-------------------------+          +--------------+
+              |                         |          |              |
+              | Firmware Build Pipeline | -------> | OCI Registry |
+              |                         |          |              |
+              +-------------------------+          +--------------+
 ```
