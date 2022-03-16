@@ -2,6 +2,8 @@ use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Context};
 use awc::{ws, Client};
 use clap::{Parser, Subcommand};
+use cloudevents::Event;
+use futures::{stream::StreamExt, TryFutureExt};
 use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -235,27 +237,46 @@ async fn main() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    //    let response = connection.next().await.unwrap().unwrap();
-
     log::info!("HTTP response: {}", response.status());
 
-    //let prefix = arstd::env::var("REGISTRY_PREFIX").unwrap();
-    //let token = std::env::var("REGISTRY_TOKEN").unwrap();
     let oci = OciClient::new(
         oci_client,
         args.registry_prefix.clone(),
         args.registry_token.clone(),
     );
 
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
             /*     .app_data(web::Data::new(            .app_data(web::Data::new(index.clone()))
             .route("/v1/poll/{image}", web::get().to(poll))
             .route("/v1/fetch/{image}/{version}", web::get().to(fetch))*/
             .route("/healthz", web::get().to(healthz))
     })
-    .bind(("0.0.0.0", 12346))?
-    .run()
-    .await?;
+    .bind(("0.0.0.0", 12346))?;
+
+    //  let main = async move {
+    loop {
+        if let Some(m) = connection.next().await {
+            if let Ok(awc::ws::Frame::Text(m)) = m {
+                match serde_json::from_slice::<Event>(&m) {
+                    Ok(Event { attributes, .. }) => {
+                        /*
+                        if let Some("dfu") = subject {
+                            log::info!("DFU event");
+                        }
+                        */
+                    }
+                    Err(e) => {
+                        log::warn!("Error parsing event: {:?}", e);
+                    }
+                }
+            }
+        }
+    }
+    //     Ok(())
+    //}
+    //.await?;
+
+    //   futures::try_join!(server.run(), main)?;
     Ok(())
 }
