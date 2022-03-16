@@ -56,7 +56,7 @@ This allows the fleet-manager to check if an update is necessary at all.
 
 ```
 {
-  "op": "SYNCED",
+  "op": "SYNC",
   "version": "0.1.0",
   "poll": 300, // The amount of time to wait before checking in again
 }
@@ -71,11 +71,10 @@ This allows the fleet-manager to check if an update is necessary at all.
   "offset": 0, // Offset in firmware exchange
   "size": 5, // Size of data
   "data": aGVsbG8= // Base64-encoded firmware block
-  "final": false,
 }
 ```
 
-4a. When a device is seeing the "SYNCED" operation, it should make sure it's current firmware version is marked as 'good'. The 'poll' field can be used as a heuristic of how long the device should wait before checking in again.
+4a. When a device is seeing the "SYNC" operation, it should make sure it's current firmware version is marked as 'good'. The 'poll' field can be used as a heuristic of how long the device should wait before checking in again.
 
 4b. When a device is seeing the "WRITE" operation, it should write the provided data to it's storage. Once persisted, it should report back using the same payload as in (1) but with some additional fields:
 
@@ -89,7 +88,7 @@ This allows the fleet-manager to check if an update is necessary at all.
 }
 ```
 
-5b. When the server receives the next event from the device, it repeats step 4b. until the complete firmware have been sent. When the final block is confirmed written, the fleet-manager will send the following command:
+5b. When the server receives the next event from the device, it repeats step 4b. until the complete firmware have been sent. When the final block is confirmed written, and it is desired to deploy the new firmware, the fleet-manager will send the following command:
 
 ```
 {
