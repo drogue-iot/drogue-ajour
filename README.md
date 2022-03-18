@@ -85,8 +85,10 @@ This allows the fleet-manager to check if an update is necessary at all.
 {
    "version": "0.1.0",
    "mtu": 512, // The desired block size to use for the next firmware block
-   "last_version": "0.1.1", // Version of the last block the device received from the server.
-   "last_offset": 0, // Offset of the last block the device received from the server.
+   "status": {
+      "version": "0.1.1", // Version of the last block the device received from the server. To safeguard against new versions arriving
+      "offset": 0, // Current write offset after applying the last firmware block.
+   }
 }
 ```
 
