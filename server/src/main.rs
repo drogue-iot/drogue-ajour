@@ -2,7 +2,8 @@ use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Context};
 use awc::{ws, Client};
 use clap::{Parser, Subcommand};
-use cloudevents::Event;
+use cloudevents::{Data, Event};
+use fleet_protocol::Status;
 use futures::{stream::StreamExt, TryFutureExt};
 use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
@@ -259,24 +260,34 @@ async fn main() -> anyhow::Result<()> {
         if let Some(m) = connection.next().await {
             if let Ok(awc::ws::Frame::Text(m)) = m {
                 match serde_json::from_slice::<Event>(&m) {
-                    Ok(Event { attributes, .. }) => {
+                    Ok(e) => {
+                        let status: Option<serde_json::Result<Status>> =
+                            e.data().map(|d| match d {
+                                Data::Binary(b) => serde_json::from_slice(&b[..]),
+                                Data::String(s) => serde_json::from_str(&s),
+                                Data::Json(v) => serde_json::from_value(v.clone()),
+                            });
+
+                        log::info!("Status: {:?}", status);
+
                         /*
-                        if let Some("dfu") = subject {
-                            log::info!("DFU event");
-                        }
-                        */
+                        // Event { attributes, .. }) => {
+                         if let Some("dfu") = subject {
+                             log::info!("DFU event");
+                         }
+                         */
                     }
                     Err(e) => {
                         log::warn!("Error parsing event: {:?}", e);
+                        break;
                     }
                 }
             }
         }
     }
-    //     Ok(())
+    Ok(())
     //}
     //.await?;
 
     //   futures::try_join!(server.run(), main)?;
-    Ok(())
 }
