@@ -2,8 +2,8 @@ use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Context};
 use awc::{ws, Client};
 use clap::{Parser, Subcommand};
-use cloudevents::{Data, Event};
-use fleet_protocol::Status;
+use cloudevents::{event::AttributeValue, Data, Event};
+use fleet_protocol::{Command, Status};
 use futures::{stream::StreamExt, TryFutureExt};
 use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
@@ -88,6 +88,24 @@ async fn fetch(oci: web::Data<OciClient>, path: web::Path<(Image, Version)>) -> 
     }
 }
 */
+
+pub struct Updater {
+    oci: OciClient,
+}
+
+impl Updater {
+    pub fn new(oci: OciClient) -> Self {
+        Self { oci }
+    }
+    pub async fn process(
+        &mut self,
+        application: &str,
+        device: &str,
+        status: Status,
+    ) -> Result<Command, anyhow::Error> {
+        Ok(Command::new_sync(&status.version, None))
+    }
+}
 
 pub struct OciClient {
     prefix: String,
@@ -201,6 +219,10 @@ struct Args {
     #[clap(long)]
     websocket_url: String,
 
+    /// URL to command endpoint
+    #[clap(long)]
+    command_url: String,
+
     /// Token for authenticating fleet manager to Drogue IoT
     #[clap(long)]
     token: String,
@@ -227,13 +249,14 @@ async fn main() -> anyhow::Result<()> {
     let url = args.websocket_url;
     let token = args.token;
     let user = args.user;
+    let command_url = args.command_url;
 
     let encoded = base64::encode(&format!("{}:{}", user, token).as_bytes());
     let basic_header = format!("Basic {}", encoded);
 
     let (response, mut connection) = Client::new()
         .ws(url)
-        .set_header("Authorization", basic_header)
+        .set_header("Authorization", basic_header.clone())
         .connect()
         .await
         .unwrap();
@@ -245,6 +268,8 @@ async fn main() -> anyhow::Result<()> {
         args.registry_prefix.clone(),
         args.registry_token.clone(),
     );
+
+    let mut updater = Updater::new(oci);
 
     let server = HttpServer::new(move || {
         App::new()
@@ -261,14 +286,60 @@ async fn main() -> anyhow::Result<()> {
             if let Ok(awc::ws::Frame::Text(m)) = m {
                 match serde_json::from_slice::<Event>(&m) {
                     Ok(e) => {
-                        let status: Option<serde_json::Result<Status>> =
-                            e.data().map(|d| match d {
-                                Data::Binary(b) => serde_json::from_slice(&b[..]),
-                                Data::String(s) => serde_json::from_str(&s),
-                                Data::Json(v) => serde_json::from_value(v.clone()),
-                            });
+                        let mut is_dfu = false;
+                        let mut application = String::new();
+                        let mut device = String::new();
+                        for a in e.iter() {
+                            log::info!("Attribute {:?}", a);
+                            if a.0 == "subject" {
+                                if let AttributeValue::String("dfu") = a.1 {
+                                    is_dfu = true;
+                                }
+                            } else if a.0 == "device" {
+                                if let AttributeValue::String(d) = a.1 {
+                                    device = d.to_string();
+                                }
+                            } else if a.0 == "application" {
+                                if let AttributeValue::String(d) = a.1 {
+                                    application = d.to_string();
+                                }
+                            }
+                        }
 
-                        log::info!("Status: {:?}", status);
+                        log::info!(
+                            "Event from app {}, device {}, is dfu: {}",
+                            application,
+                            device,
+                            is_dfu
+                        );
+
+                        if is_dfu {
+                            let status: Option<serde_json::Result<Status>> =
+                                e.data().map(|d| match d {
+                                    Data::Binary(b) => serde_json::from_slice(&b[..]),
+                                    Data::String(s) => serde_json::from_str(&s),
+                                    Data::Json(v) => serde_json::from_value(v.clone()),
+                                });
+
+                            if let Some(Ok(status)) = status {
+                                log::info!("Status: {:?}", status);
+                                let command =
+                                    updater.process(&application, &device, status).await?;
+
+                                // echo '{"target-temp":23}' | http POST https://api.sandbox.drogue.cloud/api/command/v1alpha1/apps/example%2Dapp/devices/device1 command==set-temp "Authorization:Bearer $(drg whoami -t)"
+                                log::info!("Authorization: {}", &basic_header);
+                                let response = Client::new()
+                                    .post(format!(
+                                        "{}/api/command/v1alpha1/apps/{}/devices/{}?command=dfu",
+                                        command_url, &application, &device
+                                    ))
+                                    .insert_header(("Authorization", basic_header.clone()))
+                                    .send_json(&serde_json::to_value(&command)?)
+                                    .await
+                                    .unwrap();
+                                log::info!("Response sent: {:?}", response);
+                            }
+                        }
 
                         /*
                         // Event { attributes, .. }) => {

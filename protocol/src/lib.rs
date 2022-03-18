@@ -2,15 +2,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Status {
-    version: String,
-    mtu: Option<u32>,
-    update: Option<UpdateStatus>,
+    pub version: String,
+    pub mtu: Option<u32>,
+    pub update: Option<UpdateStatus>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateStatus {
-    version: String,
-    offset: u32,
+    pub version: String,
+    pub offset: u32,
 }
 
 impl Status {
