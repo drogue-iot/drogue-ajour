@@ -1,16 +1,17 @@
+#![no_std]
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Status<'a> {
-    version: &'a str,
-    mtu: Option<u32>,
-    update: Option<UpdateStatus<'a>>,
+    pub version: &'a str,
+    pub mtu: Option<u32>,
+    pub update: Option<UpdateStatus<'a>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateStatus<'a> {
-    version: &'a str,
-    offset: u32,
+    pub version: &'a str,
+    pub offset: u32,
 }
 
 impl<'a> Status<'a> {

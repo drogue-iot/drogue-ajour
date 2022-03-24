@@ -22,3 +22,4 @@ base64 = "0.13.0"
 futures = "0.3"
 cloudevents-sdk = "0.5"
 drogue-ajour-protocol = { path = "../protocol" }
+serde_cbor = "0.11.2"

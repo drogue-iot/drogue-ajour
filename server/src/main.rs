@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context};
 use awc::{ws, Client};
 use clap::{Parser, Subcommand};
 use cloudevents::{event::AttributeValue, Data, Event};
-use fleet_protocol::{Command, Status};
+use drogue_ajour_protocol::{Command, Status, UpdateStatus};
 use futures::{stream::StreamExt, TryFutureExt};
 use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
@@ -97,12 +97,12 @@ impl Updater {
     pub fn new(oci: OciClient) -> Self {
         Self { oci }
     }
-    pub async fn process(
+    pub async fn process<'m>(
         &mut self,
         application: &str,
         device: &str,
-        status: Status,
-    ) -> Result<Command, anyhow::Error> {
+        status: Status<'m>,
+    ) -> Result<Command<'m>, anyhow::Error> {
         Ok(Command::new_sync(&status.version, None))
     }
 }
@@ -314,11 +314,15 @@ async fn main() -> anyhow::Result<()> {
                         );
 
                         if is_dfu {
-                            let status: Option<serde_json::Result<Status>> =
+                            let status: Option<Result<Status, anyhow::Error>> =
                                 e.data().map(|d| match d {
-                                    Data::Binary(b) => serde_json::from_slice(&b[..]),
-                                    Data::String(s) => serde_json::from_str(&s),
-                                    Data::Json(v) => serde_json::from_value(v.clone()),
+                                    Data::Binary(b) => {
+                                        serde_json::from_slice(&b[..]).map_err(|e| e.into())
+                                    }
+                                    Data::String(s) => {
+                                        serde_json::from_str(&s).map_err(|e| e.into())
+                                    }
+                                    Data::Json(v) => decode_json(v),
                                 });
 
                             if let Some(Ok(status)) = status {
@@ -361,4 +365,37 @@ async fn main() -> anyhow::Result<()> {
     //.await?;
 
     //   futures::try_join!(server.run(), main)?;
+}
+
+// Workaround for serde_json not able to deserialize as reference
+fn decode_json<'m>(v: &'m serde_json::Value) -> Result<Status<'m>, anyhow::Error> {
+    let version: &str = v
+        .get("version")
+        .ok_or(anyhow!("Unable to deserialize: version missing"))?
+        .as_str()
+        .unwrap();
+
+    let mtu: Option<u32> = v.get("mtu").map(|m| m.as_i64().unwrap_or(512) as u32);
+
+    let update: Option<UpdateStatus<'m>> = if let Some(u) = v.get("update") {
+        let version: &'m str = u
+            .get("version")
+            .ok_or(anyhow!("Unable to deserialize update: version missing"))?
+            .as_str()
+            .unwrap();
+        let offset: u32 = u
+            .get("offset")
+            .ok_or(anyhow!("Unable to deserialize update: offset missing"))?
+            .as_i64()
+            .unwrap() as u32;
+        Some(UpdateStatus { version, offset })
+    } else {
+        None
+    };
+
+    Ok(Status {
+        version,
+        mtu,
+        update,
+    })
 }
