@@ -1,9 +1,8 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Context};
-use awc::Client;
 use clap::Parser;
 use cloudevents::{event::AttributeValue, Data, Event};
-use drogue_ajour_protocol::{CommandRef, Status, UpdateStatus};
+use drogue_ajour_protocol::{Command, CommandRef, Status};
 use futures::{stream::StreamExt, TryFutureExt};
 use oci_distribution::{client, secrets::RegistryAuth};
 use paho_mqtt as mqtt;
@@ -13,7 +12,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::time::Duration;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Metadata {
     pub version: String,
     pub size: String,
@@ -24,20 +23,62 @@ async fn healthz() -> impl Responder {
 }
 
 pub struct Updater {
+    index: Index,
     oci: OciClient,
 }
 
 impl Updater {
-    pub fn new(oci: OciClient) -> Self {
-        Self { oci }
+    pub fn new(index: Index, oci: OciClient) -> Self {
+        Self { oci, index }
     }
     pub async fn process<'m>(
         &mut self,
         application: &str,
-        device: &str,
+        _device: &str,
         status: Status<'m>,
-    ) -> Result<CommandRef<'m>, anyhow::Error> {
-        Ok(CommandRef::new_sync(&status.version, None))
+    ) -> Result<Command, anyhow::Error> {
+        if let Some(image) = self.index.latest_version(application) {
+            match self.oci.fetch_metadata(&image).await {
+                Ok(metadata) => {
+                    if status.version == metadata.version {
+                        Ok(CommandRef::new_sync(&status.version, None).into())
+                    } else {
+                        let mut offset = 0;
+                        let mut mtu = 512;
+                        if let Some(m) = status.mtu {
+                            mtu = m as usize;
+                        }
+                        if let Some(update) = status.update {
+                            if update.version == metadata.version {
+                                offset = update.offset as usize;
+                            }
+                        }
+
+                        if offset < metadata.size.parse::<usize>().unwrap() {
+                            let firmware = self.oci.fetch_firmware(&image).await?;
+
+                            let to_copy = core::cmp::min(firmware.len() - offset, mtu);
+                            let block = &firmware[offset..offset + to_copy];
+
+                            log::trace!(
+                                "Sending firmware block offset {} size {}",
+                                offset,
+                                block.len()
+                            );
+                            Ok(
+                                CommandRef::new_write(&metadata.version, offset as u32, block)
+                                    .into(),
+                            )
+                        } else {
+                            Ok(CommandRef::new_swap(&metadata.version, &[]).into())
+                        }
+                    }
+                }
+                Err(e) => Err(e.into()),
+            }
+        } else {
+            Err(anyhow!("Unable to find latest version for {}", application))
+        }
     }
 }
 
@@ -128,7 +169,7 @@ impl Index {
     pub fn latest_version(&self, image: &str) -> Option<String> {
         let content = std::fs::read_to_string(format!("{}/{}/latest", self.dir.to_str()?, image));
         if let Ok(r) = content {
-            Some(r)
+            Some(r.trim_end().to_string())
         } else {
             None
         }
@@ -157,10 +198,6 @@ struct Args {
     #[clap(long)]
     application: String,
 
-    /// URL to command endpoint
-    #[clap(long)]
-    command_url: String,
-
     /// Token for authenticating fleet manager to Drogue IoT
     #[clap(long)]
     token: String,
@@ -173,8 +210,12 @@ struct Args {
     #[clap(long)]
     disable_tls: bool,
 
-    /// Port for health endpoint
+    /// Disable /health endpoint
     #[clap(long)]
+    disable_health: bool,
+
+    /// Port for health endpoint
+    #[clap(long, default_value_t = 8080)]
     health_port: u16,
 }
 
@@ -194,7 +235,6 @@ async fn main() -> anyhow::Result<()> {
     let index = Index::new(index_dir);
     let mqtt_uri = args.mqtt_uri;
     let token = args.token;
-    let command_url = args.command_url;
     let application = args.application;
 
     let mqtt_opts = mqtt::CreateOptionsBuilder::new()
@@ -230,74 +270,40 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Failed to connect to MQTT endpoint")?;
 
-    let updater = Updater::new(oci);
+    let updater = Updater::new(index, oci);
 
-    let command = CommandEndpoint::new(command_url, application.clone(), token);
+    let healthz = if !args.disable_health {
+        Some(
+            HttpServer::new(move || App::new().route("/healthz", web::get().to(healthz)))
+                .bind(("0.0.0.0", args.health_port))?
+                .run(),
+        )
+    } else {
+        None
+    };
 
-    let healthz = HttpServer::new(move || App::new().route("/healthz", web::get().to(healthz)))
-        .bind(("0.0.0.0", args.health_port))?
-        .run();
+    let mut app = Server::new(mqtt_client, application, updater);
 
-    let mut app = Server::new(mqtt_client, application, updater, command);
-
-    futures::try_join!(app.run(), healthz.err_into())?;
+    if let Some(h) = healthz {
+        futures::try_join!(app.run(), h.err_into())?;
+    } else {
+        app.run().await?;
+    }
     Ok(())
-}
-
-pub struct CommandEndpoint {
-    url: String,
-    application: String,
-    token: String,
-}
-
-impl CommandEndpoint {
-    pub fn new(url: String, application: String, token: String) -> Self {
-        Self {
-            url,
-            application,
-            token,
-        }
-    }
-
-    pub async fn send<'m>(
-        &mut self,
-        device: &str,
-        command: CommandRef<'m>,
-    ) -> Result<(), anyhow::Error> {
-        let auth_header = format!("Bearer {}", self.token);
-        log::info!("Authorization: {}", &auth_header);
-        let response = Client::new()
-            .post(format!(
-                "{}/api/command/v1alpha1/apps/{}/devices/{}?command=dfu",
-                self.url, &self.application, &device
-            ))
-            .insert_header(("Authorization", auth_header.clone()))
-            .send_json(&serde_json::to_value(&command)?)
-            .await
-            .unwrap();
-        Ok(())
-    }
 }
 
 pub struct Server {
     client: mqtt::AsyncClient,
     application: String,
     updater: Updater,
-    command: CommandEndpoint,
 }
 
 impl Server {
-    fn new(
-        client: mqtt::AsyncClient,
-        application: String,
-        updater: Updater,
-        command: CommandEndpoint,
-    ) -> Self {
+    fn new(client: mqtt::AsyncClient, application: String, updater: Updater) -> Self {
         Self {
             client,
             application,
             updater,
-            command,
         }
     }
 
@@ -307,16 +313,14 @@ impl Server {
             .subscribe(format!("app/{}", &self.application), 1);
         loop {
             if let Some(m) = stream.next().await {
-                log::info!("Next something");
                 if let Some(m) = m {
-                    log::info!("Got message: {:?}", m);
                     match serde_json::from_slice::<Event>(m.payload()) {
                         Ok(e) => {
                             let mut is_dfu = false;
                             let mut application = String::new();
                             let mut device = String::new();
                             for a in e.iter() {
-                                log::info!("Attribute {:?}", a);
+                                log::trace!("Attribute {:?}", a);
                                 if a.0 == "subject" {
                                     if let AttributeValue::String("dfu") = a.1 {
                                         is_dfu = true;
@@ -332,7 +336,7 @@ impl Server {
                                 }
                             }
 
-                            log::info!(
+                            log::trace!(
                                 "Event from app {}, device {}, is dfu: {}",
                                 application,
                                 device,
@@ -352,14 +356,19 @@ impl Server {
                                             .map_err(|e| e.into()),
                                     });
 
-                                log::info!("Status decode: {:?}", status);
+                                log::trace!("Status decode: {:?}", status);
 
                                 if let Some(Ok(status)) = status {
-                                    log::info!("Status: {:?}", status);
+                                    log::info!("Received status from {}: {:?}", device, status);
                                     let command =
                                         self.updater.process(&application, &device, status).await?;
 
-                                    self.command.send(&device, command).await?;
+                                    log::info!("Sending command to {}: {:?}", device, command);
+
+                                    let topic = format!("command/{}/{}/dfu", application, device);
+                                    let message =
+                                        mqtt::Message::new(topic, serde_json::to_vec(&command)?, 1);
+                                    self.client.publish(message).await?;
                                 }
                             }
                         }
