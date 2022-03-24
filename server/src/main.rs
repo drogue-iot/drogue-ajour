@@ -1,27 +1,17 @@
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Context};
-use awc::{ws, Client};
-use clap::{Parser, Subcommand};
+use awc::Client;
+use clap::Parser;
 use cloudevents::{event::AttributeValue, Data, Event};
 use drogue_ajour_protocol::{CommandRef, Status, UpdateStatus};
 use futures::{stream::StreamExt, TryFutureExt};
 use oci_distribution::{client, secrets::RegistryAuth};
+use paho_mqtt as mqtt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::Read;
 use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::sync::Mutex;
-
-#[derive(Serialize, Deserialize)]
-pub struct PollResponse {
-    /// Current expected version
-    pub current: Option<Metadata>,
-
-    /// Poll interval
-    pub interval: Option<i64>,
-}
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize)]
 pub struct Metadata {
@@ -29,65 +19,9 @@ pub struct Metadata {
     pub size: String,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct FirmwareResponse {
-    pub metadata: Metadata,
-    pub payload: Vec<u8>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Image(pub String);
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Version(pub String);
-
 async fn healthz() -> impl Responder {
     HttpResponse::Ok().finish()
 }
-
-/*
-async fn poll(
-    oci: web::Data<OciClient>,
-    index: web::Data<Index>,
-    image: web::Path<Image>,
-) -> impl Responder {
-    let data = if let Some(version) = index.latest_version(&image.0) {
-        let image_ref = format!("{}:{}", &image.0, &version);
-        match oci.fetch_metadata(&image_ref).await {
-            Ok(result) => Some(result),
-            Err(e) => {
-                log::info!("Error during metadata fetch: {:?}", e);
-                None
-            }
-        }
-    } else {
-        None
-    };
-    HttpResponse::Ok().json(PollResponse {
-        current: data,
-        interval: Some(30),
-    })
-}
-
-async fn fetch(oci: web::Data<OciClient>, path: web::Path<(Image, Version)>) -> impl Responder {
-    let (image, version) = path.into_inner();
-    let image_ref = format!("{}:{}", &image.0, &version.0);
-    let metadata = oci.fetch_metadata(&image_ref).await;
-    if let Ok(metadata) = metadata {
-        let payload = oci.fetch_firmware(&image_ref).await;
-        match payload {
-            Ok(payload) => HttpResponse::Ok().body(payload),
-            Err(e) => {
-                log::info!("Error fetching firmware for {}: {:?}", image_ref, e);
-                HttpResponse::NotFound().finish()
-            }
-        }
-    } else {
-        log::info!("Error fetching metadata for {}", image_ref);
-        HttpResponse::NotFound().finish()
-    }
-}
-*/
 
 pub struct Updater {
     oci: OciClient,
@@ -215,9 +149,13 @@ struct Args {
     #[clap(long)]
     registry_token: Option<String>,
 
-    /// URL to websocket endpoint for application
+    /// Mqtt server uri (tcp://host:port)
     #[clap(long)]
-    websocket_url: String,
+    mqtt_uri: String,
+
+    /// Name of application to manage firmware updates for
+    #[clap(long)]
+    application: String,
 
     /// URL to command endpoint
     #[clap(long)]
@@ -227,9 +165,17 @@ struct Args {
     #[clap(long)]
     token: String,
 
-    /// Username for authenticating fleet manager to Drogue IoT
+    /// Allow insecure TLS configuration
     #[clap(long)]
-    user: String,
+    tls_insecure: bool,
+
+    /// Disable TLS
+    #[clap(long)]
+    disable_tls: bool,
+
+    /// Port for health endpoint
+    #[clap(long)]
+    health_port: u16,
 }
 
 #[actix_web::main]
@@ -246,22 +192,32 @@ async fn main() -> anyhow::Result<()> {
 
     let index_dir = args.index_dir;
     let index = Index::new(index_dir);
-    let url = args.websocket_url;
+    let mqtt_uri = args.mqtt_uri;
     let token = args.token;
-    let user = args.user;
     let command_url = args.command_url;
+    let application = args.application;
 
-    let encoded = base64::encode(&format!("{}:{}", user, token).as_bytes());
-    let basic_header = format!("Basic {}", encoded);
+    let mqtt_opts = mqtt::CreateOptionsBuilder::new()
+        .server_uri(mqtt_uri)
+        .client_id("drogue-ajour")
+        .finalize();
+    let mqtt_client = mqtt::AsyncClient::new(mqtt_opts)?;
 
-    let (response, mut connection) = Client::new()
-        .ws(url)
-        .set_header("Authorization", basic_header.clone())
-        .connect()
-        .await
-        .unwrap();
+    let mut conn_opts = mqtt::ConnectOptionsBuilder::new();
+    conn_opts.password(token.clone());
+    conn_opts.keep_alive_interval(Duration::from_secs(30));
+    conn_opts.automatic_reconnect(Duration::from_millis(100), Duration::from_secs(5));
 
-    log::info!("HTTP response: {}", response.status());
+    if !args.disable_tls {
+        conn_opts.ssl_options(
+            mqtt::SslOptionsBuilder::new()
+                .enable_server_cert_auth(false)
+                .verify(false)
+                .finalize(),
+        );
+    }
+
+    let conn_opts = conn_opts.finalize();
 
     let oci = OciClient::new(
         oci_client,
@@ -269,133 +225,152 @@ async fn main() -> anyhow::Result<()> {
         args.registry_token.clone(),
     );
 
-    let mut updater = Updater::new(oci);
+    mqtt_client
+        .connect(conn_opts)
+        .await
+        .context("Failed to connect to MQTT endpoint")?;
 
-    let server = HttpServer::new(move || {
-        App::new()
-            /*     .app_data(web::Data::new(            .app_data(web::Data::new(index.clone()))
-            .route("/v1/poll/{image}", web::get().to(poll))
-            .route("/v1/fetch/{image}/{version}", web::get().to(fetch))*/
-            .route("/healthz", web::get().to(healthz))
-    })
-    .bind(("0.0.0.0", 12346))?;
+    let updater = Updater::new(oci);
 
-    //  let main = async move {
-    loop {
-        if let Some(m) = connection.next().await {
-            if let Ok(awc::ws::Frame::Text(m)) = m {
-                match serde_json::from_slice::<Event>(&m) {
-                    Ok(e) => {
-                        let mut is_dfu = false;
-                        let mut application = String::new();
-                        let mut device = String::new();
-                        for a in e.iter() {
-                            log::info!("Attribute {:?}", a);
-                            if a.0 == "subject" {
-                                if let AttributeValue::String("dfu") = a.1 {
-                                    is_dfu = true;
+    let command = CommandEndpoint::new(command_url, application.clone(), token);
+
+    let healthz = HttpServer::new(move || App::new().route("/healthz", web::get().to(healthz)))
+        .bind(("0.0.0.0", args.health_port))?
+        .run();
+
+    let mut app = Server::new(mqtt_client, application, updater, command);
+
+    futures::try_join!(app.run(), healthz.err_into())?;
+    Ok(())
+}
+
+pub struct CommandEndpoint {
+    url: String,
+    application: String,
+    token: String,
+}
+
+impl CommandEndpoint {
+    pub fn new(url: String, application: String, token: String) -> Self {
+        Self {
+            url,
+            application,
+            token,
+        }
+    }
+
+    pub async fn send<'m>(
+        &mut self,
+        device: &str,
+        command: CommandRef<'m>,
+    ) -> Result<(), anyhow::Error> {
+        let auth_header = format!("Bearer {}", self.token);
+        log::info!("Authorization: {}", &auth_header);
+        let response = Client::new()
+            .post(format!(
+                "{}/api/command/v1alpha1/apps/{}/devices/{}?command=dfu",
+                self.url, &self.application, &device
+            ))
+            .insert_header(("Authorization", auth_header.clone()))
+            .send_json(&serde_json::to_value(&command)?)
+            .await
+            .unwrap();
+        Ok(())
+    }
+}
+
+pub struct Server {
+    client: mqtt::AsyncClient,
+    application: String,
+    updater: Updater,
+    command: CommandEndpoint,
+}
+
+impl Server {
+    fn new(
+        client: mqtt::AsyncClient,
+        application: String,
+        updater: Updater,
+        command: CommandEndpoint,
+    ) -> Self {
+        Self {
+            client,
+            application,
+            updater,
+            command,
+        }
+    }
+
+    async fn run(&mut self) -> Result<(), anyhow::Error> {
+        let mut stream = self.client.get_stream(100);
+        self.client
+            .subscribe(format!("app/{}", &self.application), 1);
+        loop {
+            if let Some(m) = stream.next().await {
+                log::info!("Next something");
+                if let Some(m) = m {
+                    log::info!("Got message: {:?}", m);
+                    match serde_json::from_slice::<Event>(m.payload()) {
+                        Ok(e) => {
+                            let mut is_dfu = false;
+                            let mut application = String::new();
+                            let mut device = String::new();
+                            for a in e.iter() {
+                                log::info!("Attribute {:?}", a);
+                                if a.0 == "subject" {
+                                    if let AttributeValue::String("dfu") = a.1 {
+                                        is_dfu = true;
+                                    }
+                                } else if a.0 == "device" {
+                                    if let AttributeValue::String(d) = a.1 {
+                                        device = d.to_string();
+                                    }
+                                } else if a.0 == "application" {
+                                    if let AttributeValue::String(d) = a.1 {
+                                        application = d.to_string();
+                                    }
                                 }
-                            } else if a.0 == "device" {
-                                if let AttributeValue::String(d) = a.1 {
-                                    device = d.to_string();
-                                }
-                            } else if a.0 == "application" {
-                                if let AttributeValue::String(d) = a.1 {
-                                    application = d.to_string();
+                            }
+
+                            log::info!(
+                                "Event from app {}, device {}, is dfu: {}",
+                                application,
+                                device,
+                                is_dfu
+                            );
+
+                            if is_dfu {
+                                let status: Option<Result<Status, anyhow::Error>> =
+                                    e.data().map(|d| match d {
+                                        Data::Binary(b) => {
+                                            serde_json::from_slice(&b[..]).map_err(|e| e.into())
+                                        }
+                                        Data::String(s) => {
+                                            serde_json::from_str(&s).map_err(|e| e.into())
+                                        }
+                                        Data::Json(v) => serde_json::from_str(v.as_str().unwrap())
+                                            .map_err(|e| e.into()),
+                                    });
+
+                                log::info!("Status decode: {:?}", status);
+
+                                if let Some(Ok(status)) = status {
+                                    log::info!("Status: {:?}", status);
+                                    let command =
+                                        self.updater.process(&application, &device, status).await?;
+
+                                    self.command.send(&device, command).await?;
                                 }
                             }
                         }
-
-                        log::info!(
-                            "Event from app {}, device {}, is dfu: {}",
-                            application,
-                            device,
-                            is_dfu
-                        );
-
-                        if is_dfu {
-                            let status: Option<Result<Status, anyhow::Error>> =
-                                e.data().map(|d| match d {
-                                    Data::Binary(b) => {
-                                        serde_json::from_slice(&b[..]).map_err(|e| e.into())
-                                    }
-                                    Data::String(s) => {
-                                        serde_json::from_str(&s).map_err(|e| e.into())
-                                    }
-                                    Data::Json(v) => decode_json(v),
-                                });
-
-                            if let Some(Ok(status)) = status {
-                                log::info!("Status: {:?}", status);
-                                let command =
-                                    updater.process(&application, &device, status).await?;
-
-                                // echo '{"target-temp":23}' | http POST https://api.sandbox.drogue.cloud/api/command/v1alpha1/apps/example%2Dapp/devices/device1 command==set-temp "Authorization:Bearer $(drg whoami -t)"
-                                log::info!("Authorization: {}", &basic_header);
-                                let response = Client::new()
-                                    .post(format!(
-                                        "{}/api/command/v1alpha1/apps/{}/devices/{}?command=dfu",
-                                        command_url, &application, &device
-                                    ))
-                                    .insert_header(("Authorization", basic_header.clone()))
-                                    .send_json(&serde_json::to_value(&command)?)
-                                    .await
-                                    .unwrap();
-                                log::info!("Response sent: {:?}", response);
-                            }
+                        Err(e) => {
+                            log::warn!("Error parsing event: {:?}", e);
+                            break;
                         }
-
-                        /*
-                        // Event { attributes, .. }) => {
-                         if let Some("dfu") = subject {
-                             log::info!("DFU event");
-                         }
-                         */
-                    }
-                    Err(e) => {
-                        log::warn!("Error parsing event: {:?}", e);
-                        break;
                     }
                 }
             }
         }
+        Ok(())
     }
-    Ok(())
-    //}
-    //.await?;
-
-    //   futures::try_join!(server.run(), main)?;
-}
-
-// Workaround for serde_json not able to deserialize as reference
-fn decode_json<'m>(v: &'m serde_json::Value) -> Result<Status<'m>, anyhow::Error> {
-    let version: &str = v
-        .get("version")
-        .ok_or(anyhow!("Unable to deserialize: version missing"))?
-        .as_str()
-        .unwrap();
-
-    let mtu: Option<u32> = v.get("mtu").map(|m| m.as_i64().unwrap_or(512) as u32);
-
-    let update: Option<UpdateStatus<'m>> = if let Some(u) = v.get("update") {
-        let version: &'m str = u
-            .get("version")
-            .ok_or(anyhow!("Unable to deserialize update: version missing"))?
-            .as_str()
-            .unwrap();
-        let offset: u32 = u
-            .get("offset")
-            .ok_or(anyhow!("Unable to deserialize update: offset missing"))?
-            .as_i64()
-            .unwrap() as u32;
-        Some(UpdateStatus { version, offset })
-    } else {
-        None
-    };
-
-    Ok(Status {
-        version,
-        mtu,
-        update,
-    })
 }
