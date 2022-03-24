@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context};
 use awc::{ws, Client};
 use clap::{Parser, Subcommand};
 use cloudevents::{event::AttributeValue, Data, Event};
-use drogue_ajour_protocol::{Command, Status, UpdateStatus};
+use drogue_ajour_protocol::{CommandRef, Status, UpdateStatus};
 use futures::{stream::StreamExt, TryFutureExt};
 use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
@@ -102,8 +102,8 @@ impl Updater {
         application: &str,
         device: &str,
         status: Status<'m>,
-    ) -> Result<Command<'m>, anyhow::Error> {
-        Ok(Command::new_sync(&status.version, None))
+    ) -> Result<CommandRef<'m>, anyhow::Error> {
+        Ok(CommandRef::new_sync(&status.version, None))
     }
 }
 
