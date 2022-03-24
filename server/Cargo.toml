@@ -1,5 +1,5 @@
 [package]
-name = "drogue-fleet-manager"
+name = "drogue-ajour"
 version = "0.1.0"
 edition = "2021"
 description = "A firmware management service"
@@ -21,4 +21,4 @@ flate2 = "1"
 base64 = "0.13.0"
 futures = "0.3"
 cloudevents-sdk = "0.5"
-fleet-protocol = { path = "../protocol" }
+drogue-ajour-protocol = { path = "../protocol" }
