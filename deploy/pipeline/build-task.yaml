@@ -4,19 +4,20 @@ metadata:
   name: firmware-build
 spec:
   params:
-    - description: Build command
-      name: BUILD_COMMAND
+    - default: .
+      name: PROJECT_PATH
+      description: Path to cargo project to build
       type: string
-      default: cargo objcopy --release -- -O binary firmware.bin
   steps:
     - command:
         - /bin/bash
         - '-c'
         - >-
-          cd $(workspaces.input.path)/ &&
+          cp Dockerfile $(workspaces.input.path)/$(params.PROJECT_PATH) &&
+          cd $(workspaces.input.path)/$(params.PROJECT_PATH) &&
           git rev-parse --short HEAD | tr -d '\n' > $(results.revision.path) &&
-          REVISION=$(cat $(results.revision.path)) $(params.BUILD_COMMAND)
-          ./.ci/build.sh
+          REVISION=$(cat $(results.revision.path)) cargo objcopy --release -- -O binary firmware.bin &&
+          REV=$(cat $(results.revision.path)) SZ=$(du -b firmware.bin | cut -f1) SHA=$(sha256sum firmware.bin) echo "{\"version\":\"${REV}\",\"size\":\"{SZ}\",\"checksum\":\"${SHA}\"}" > firmware.json
       image: 'docker.io/lulf/firmware-builder:latest'
       name: build
       resources: {}

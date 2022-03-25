@@ -11,6 +11,10 @@ spec:
       description: Revision
       name: GIT_REVISION
       type: string
+    - default: .
+      name: PROJECT_PATH
+      description: Path to cargo project to build
+      type: string
     - default: image-registry.openshift-image-registry.svc:5000
       description: Registry for image
       name: REGISTRY
@@ -34,6 +38,9 @@ spec:
         - name: output
           workspace: build
     - name: firmware-build
+      params:
+        - name: PROJECT_PATH
+          value: $(params.PROJECT_PATH)
       runAfter:
         - fetch-repository
       taskRef:
@@ -45,13 +52,14 @@ spec:
     - name: firmware-deploy
       params:
         - name: IMAGE
-          value: $(params.REGISTRY)/$(params.IMAGE):$(tasks.firmware-build.results.revision)
+          #value: $(params.REGISTRY)/$(params.IMAGE):$(tasks.firmware-build.results.revision)
+          value: $(params.REGISTRY)/$(params.IMAGE):latest
         - name: DOCKERFILE
-          value: $(workspaces.source.path)/Dockerfile
+          value: $(workspaces.source.path)/$(params.PROJECT_PATH)/Dockerfile
         - name: CONTEXT
-          value: $(workspaces.source.path)
+          value: $(workspaces.source.path)/$(params.PROJECT_PATH)
         - name: BUILD_EXTRA_ARGS
-          value: --label io.drogue.metadata="`cat $(workspaces.source.path)/firmware.json`"
+          value: --label io.drogue.metadata="`cat $(workspaces.source.path)/$(params.PROJECT_PATH)/firmware.json`"
       runAfter:
         - firmware-build
       taskRef:
@@ -60,16 +68,5 @@ spec:
       workspaces:
         - name: source
           workspace: build
-    - name: registry-update
-      params:
-        - name: IMAGE
-          value: $(params.FIRMWARE_NAME)
-        - name: REVISION
-          value: $(tasks.firmware-build.results.revision)
-      runAfter:
-        - firmware-deploy
-      taskRef:
-        kind: Task
-        name: registry-update
   workspaces:
     - name: build

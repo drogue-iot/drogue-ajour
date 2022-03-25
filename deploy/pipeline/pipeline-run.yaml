@@ -1,0 +1,24 @@
+﻿apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: oci-firmware-build
+spec:
+  params:
+    - name: GIT_REPO
+      value: 'https://github.com/lulf/dfu-workshop'
+    - name: GIT_REVISION
+      value: main
+    - name: PROJECT_PATH
+      value: .
+    - name: REGISTRY
+      value: 'image-registry.openshift-image-registry.svc:5000'
+    - name: IMAGE
+      value: drogue-ajour/dfu-workshop
+  pipelineRef:
+    name: oci-firmware
+  serviceAccountName: pipeline
+  timeout: 1h0m0s
+  workspaces:
+    - name: build
+      persistentVolumeClaim:
+        claimName: build-workspace
