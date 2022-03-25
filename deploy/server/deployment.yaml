@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: endpoint
-        image: docker.io/lulf/drogue-ajour:latest
+        image: quay.io/lulf0/drogue-ajour:latest
         imagePullPolicy: Always
         env:
           - name: RUST_LOG
