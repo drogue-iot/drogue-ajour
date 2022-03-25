@@ -11,9 +11,12 @@ spec:
       description: Revision
       name: GIT_REVISION
       type: string
-    - default: image-registry.openshift-image-registry.svc:5000/
-      description: Firmware image name
+    - default: image-registry.openshift-image-registry.svc:5000
+      description: Registry for image
       name: REGISTRY
+      type: string
+    - description: Firmware image name
+      name: IMAGE
       type: string
   tasks:
     - name: fetch-repository
@@ -42,13 +45,13 @@ spec:
     - name: firmware-deploy
       params:
         - name: IMAGE
-          value: $(params.REGISTRY)/$(params.FIRMWARE_NAME):$(tasks.firmware-build.results.revision)
+          value: $(params.REGISTRY)/$(params.IMAGE):$(tasks.firmware-build.results.revision)
         - name: DOCKERFILE
           value: $(workspaces.source.path)/Dockerfile
         - name: CONTEXT
           value: $(workspaces.source.path)
         - name: BUILD_EXTRA_ARGS
-          value: --label io.drogue.metadata="`cat $(workspaces.source.path)/firmware/application/firmware.json`"
+          value: --label io.drogue.metadata="`cat $(workspaces.source.path)/firmware.json`"
       runAfter:
         - firmware-build
       taskRef:

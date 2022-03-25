@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drogue-ajour
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: drogue-ajour
+  template:
+    metadata:
+      labels:
+        app: drogue-ajour
+    spec:
+      containers:
+      - name: endpoint
+        image: docker.io/lulf/drogue-ajour:latest
+        imagePullPolicy: Always
+        env:
+          - name: RUST_LOG
+            value: debug
+          - name: OCI_REGISTRY_PREFIX
+            valueFrom:
+              secretKeyRef:
+                name: container-registry
+                key: prefix
+          - name: DROGUE_APPLICATION
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: application
+          - name: DROGUE_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: token
+          - name: DROGUE_USER
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: user
+          - name: DROGUE_DEVICE_REGISTRY
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: registry-url
+          - name: DROGUE_MQTT_INTEGRATION
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: mqtt-integration
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080

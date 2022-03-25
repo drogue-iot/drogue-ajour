@@ -64,6 +64,10 @@ struct Args {
     #[clap(long)]
     disable_tls: bool,
 
+    /// Ignore cert validation
+    #[clap(long)]
+    insecure_tls: bool,
+
     /// Disable /health endpoint
     #[clap(long)]
     disable_health: bool,
@@ -97,6 +101,7 @@ async fn main() -> anyhow::Result<()> {
     let mqtt_opts = mqtt::CreateOptionsBuilder::new()
         .server_uri(mqtt_uri)
         .client_id("drogue-ajour")
+        .persistence(mqtt::PersistenceType::None)
         .finalize();
     let mqtt_client = mqtt::AsyncClient::new(mqtt_opts)?;
 
@@ -119,7 +124,15 @@ async fn main() -> anyhow::Result<()> {
         let ca = args
             .ca_path
             .unwrap_or("/etc/ssl/certs/ca-bundle.crt".to_string());
-        let ssl_opts = mqtt::SslOptionsBuilder::new().trust_store(&ca)?.finalize();
+        let ssl_opts = if args.insecure_tls {
+            mqtt::SslOptionsBuilder::new()
+                .trust_store(&ca)?
+                .enable_server_cert_auth(false)
+                .verify(false)
+                .finalize()
+        } else {
+            mqtt::SslOptionsBuilder::new().trust_store(&ca)?.finalize()
+        };
         conn_opts.ssl_options(ssl_opts);
     }
 

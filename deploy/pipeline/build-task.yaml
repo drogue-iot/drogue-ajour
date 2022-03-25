@@ -3,13 +3,19 @@ kind: Task
 metadata:
   name: firmware-build
 spec:
+  params:
+    - description: Build command
+      name: BUILD_COMMAND
+      type: string
+      default: cargo objcopy --release -- -O binary firmware.bin
   steps:
     - command:
         - /bin/bash
         - '-c'
         - >-
-          cd $(workspaces.input.path)/firmware/application &&
+          cd $(workspaces.input.path)/ &&
           git rev-parse --short HEAD | tr -d '\n' > $(results.revision.path) &&
+          REVISION=$(cat $(results.revision.path)) $(params.BUILD_COMMAND)
           ./.ci/build.sh
       image: 'docker.io/lulf/firmware-builder:latest'
       name: build
