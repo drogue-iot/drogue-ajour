@@ -3,14 +3,16 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use cloudevents::{event::AttributeValue, Data, Event};
 use drogue_ajour_protocol::{Command, Status};
+use drogue_client::{dialect, openid::AccessTokenProvider, Section, Translator};
 use futures::{stream::StreamExt, TryFutureExt};
 use oci_distribution::{client, secrets::RegistryAuth};
 use paho_mqtt as mqtt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::Read;
-use std::path::PathBuf;
 use std::time::Duration;
+
+type DrogueClient = drogue_client::registry::v1::Client<AccessTokenProvider>;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Metadata {
@@ -35,45 +37,50 @@ impl Updater {
     pub async fn process(
         &mut self,
         application: &str,
-        _device: &str,
+        device: &str,
         status: Status,
     ) -> Result<Command, anyhow::Error> {
-        if let Some(image) = self.index.latest_version(application) {
-            match self.oci.fetch_metadata(&image).await {
-                Ok(metadata) => {
-                    if status.version == metadata.version {
-                        Ok(Command::new_sync(&status.version, None))
-                    } else {
-                        let mut offset = 0;
-                        let mut mtu = 512;
-                        if let Some(m) = status.mtu {
-                            mtu = m as usize;
-                        }
-                        if let Some(update) = status.update {
-                            if update.version == metadata.version {
-                                offset = update.offset as usize;
+        if let Some(spec) = self.index.latest_version(application, device).await? {
+            match spec {
+                FirmwareSpec::OCI { image } => match self.oci.fetch_metadata(&image).await {
+                    Ok(metadata) => {
+                        if status.version == metadata.version {
+                            Ok(Command::new_sync(&status.version, None))
+                        } else {
+                            let mut offset = 0;
+                            let mut mtu = 512;
+                            if let Some(m) = status.mtu {
+                                mtu = m as usize;
+                            }
+                            if let Some(update) = status.update {
+                                if update.version == metadata.version {
+                                    offset = update.offset as usize;
+                                }
+                            }
+
+                            if offset < metadata.size.parse::<usize>().unwrap() {
+                                let firmware = self.oci.fetch_firmware(&image).await?;
+
+                                let to_copy = core::cmp::min(firmware.len() - offset, mtu);
+                                let block = &firmware[offset..offset + to_copy];
+
+                                log::trace!(
+                                    "Sending firmware block offset {} size {}",
+                                    offset,
+                                    block.len()
+                                );
+                                Ok(Command::new_write(&metadata.version, offset as u32, block))
+                            } else {
+                                let data = hex::decode(&metadata.checksum)?;
+                                Ok(Command::new_swap(&metadata.version, &data))
                             }
                         }
-
-                        if offset < metadata.size.parse::<usize>().unwrap() {
-                            let firmware = self.oci.fetch_firmware(&image).await?;
-
-                            let to_copy = core::cmp::min(firmware.len() - offset, mtu);
-                            let block = &firmware[offset..offset + to_copy];
-
-                            log::trace!(
-                                "Sending firmware block offset {} size {}",
-                                offset,
-                                block.len()
-                            );
-                            Ok(Command::new_write(&metadata.version, offset as u32, block))
-                        } else {
-                            let data = hex::decode(&metadata.checksum)?;
-                            Ok(Command::new_swap(&metadata.version, &data))
-                        }
                     }
+                    Err(e) => Err(e.into()),
+                },
+                FirmwareSpec::HAWKBIT => {
+                    todo!("hawkbit firmware spec no yet supported")
                 }
-                Err(e) => Err(e.into()),
             }
         } else {
             Err(anyhow!("Unable to find latest version for {}", application))
@@ -88,12 +95,17 @@ pub struct OciClient {
 }
 
 impl OciClient {
-    pub fn new(client: client::Client, prefix: String, token: Option<String>) -> Self {
+    pub fn new(
+        client: client::Client,
+        prefix: String,
+        user: Option<String>,
+        token: Option<String>,
+    ) -> Self {
         Self {
             client,
             prefix,
             auth: token
-                .map(|t| RegistryAuth::Basic("".to_string(), t))
+                .map(|t| RegistryAuth::Basic(user.unwrap_or("".to_string()), t))
                 .unwrap_or(RegistryAuth::Anonymous),
         }
     }
@@ -158,48 +170,85 @@ impl OciClient {
 }
 #[derive(Clone)]
 pub struct Index {
-    dir: PathBuf,
+    client: DrogueClient,
+}
+
+dialect!(FirmwareSpec [Section::Spec => "firmware"]);
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum FirmwareSpec {
+    #[serde(rename = "oci")]
+    OCI { image: String },
+    #[serde(rename = "hawkbit")]
+    HAWKBIT,
 }
 
 impl Index {
-    pub fn new(dir: PathBuf) -> Self {
-        Self { dir }
+    pub fn new(client: DrogueClient) -> Self {
+        Self { client }
     }
-    pub fn latest_version(&self, image: &str) -> Option<String> {
-        let content = std::fs::read_to_string(format!("{}/{}/latest", self.dir.to_str()?, image));
-        if let Ok(r) = content {
-            Some(r.trim_end().to_string())
-        } else {
-            None
+    pub async fn latest_version(
+        &self,
+        application: &str,
+        device: &str,
+    ) -> Result<Option<FirmwareSpec>, anyhow::Error> {
+        // Check if we got a device on the device first
+        if let Some(device) = self.client.get_device(application, device).await? {
+            log::info!("WE GOT DEVICE {:?}", device);
+            if let Some(spec) = device.section::<FirmwareSpec>() {
+                return Ok(Some(spec?));
+            }
         }
+
+        let app = self.client.get_app(application).await?;
+        if let Some(app) = app {
+            // Check if we've got a device spec first;
+            if let Some(spec) = app.section::<FirmwareSpec>() {
+                return Ok(Some(spec?));
+            }
+        }
+        Ok(None)
     }
 }
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// Directory where firmware index is stored
-    #[clap(long, default_value = "/registry")]
-    index_dir: PathBuf,
-
     /// Prefix to use for container registry storing images
     #[clap(long)]
-    registry_prefix: String,
+    oci_registry_prefix: String,
 
     /// Token to use for authenticating to registry
     #[clap(long)]
-    registry_token: Option<String>,
+    oci_registry_token: Option<String>,
+
+    /// User to use for authenticating to registry
+    #[clap(long)]
+    oci_registry_user: Option<String>,
+
+    /// Token to use for authenticating to registry
+    #[clap(long)]
+    oci_registry_insecure: bool,
 
     /// Mqtt server uri (tcp://host:port)
     #[clap(long)]
     mqtt_uri: String,
 
+    /// Device registry URL
+    /// Mqtt server uri (tcp://host:port)
+    #[clap(long)]
+    device_registry: String,
+
     /// Name of application to manage firmware updates for
     #[clap(long)]
     application: String,
 
-    /// Token for authenticating fleet manager to Drogue IoT
+    /// Token for authenticating ajour to Drogue IoT
     #[clap(long)]
     token: String,
+
+    /// User for authenticating ajour to Drogue IoT
+    #[clap(long)]
+    user: String,
 
     /// Path to CA
     #[clap(long)]
@@ -225,13 +274,11 @@ async fn main() -> anyhow::Result<()> {
 
     let oci_client = client::Client::new(client::ClientConfig {
         protocol: client::ClientProtocol::Https,
-        accept_invalid_hostnames: true,
-        accept_invalid_certificates: true,
+        accept_invalid_hostnames: args.oci_registry_insecure,
+        accept_invalid_certificates: args.oci_registry_insecure,
         extra_root_certificates: Vec::new(),
     });
 
-    let index_dir = args.index_dir;
-    let index = Index::new(index_dir);
     let mqtt_uri = args.mqtt_uri;
     let token = args.token;
     let application = args.application;
@@ -242,7 +289,17 @@ async fn main() -> anyhow::Result<()> {
         .finalize();
     let mqtt_client = mqtt::AsyncClient::new(mqtt_opts)?;
 
+    let tp = AccessTokenProvider {
+        user: args.user.to_string(),
+        token: token.to_string(),
+    };
+
+    let url = reqwest::Url::parse(&args.device_registry)?;
+    let drg = DrogueClient::new(reqwest::Client::new(), url, tp);
+    let index = Index::new(drg);
+
     let mut conn_opts = mqtt::ConnectOptionsBuilder::new();
+    conn_opts.user_name(args.user);
     conn_opts.password(token.clone());
     conn_opts.keep_alive_interval(Duration::from_secs(30));
     conn_opts.automatic_reconnect(Duration::from_millis(100), Duration::from_secs(5));
@@ -259,8 +316,9 @@ async fn main() -> anyhow::Result<()> {
 
     let oci = OciClient::new(
         oci_client,
-        args.registry_prefix.clone(),
-        args.registry_token.clone(),
+        args.oci_registry_prefix.clone(),
+        args.oci_registry_user.clone(),
+        args.oci_registry_token.clone(),
     );
 
     mqtt_client
@@ -358,15 +416,25 @@ impl Server {
 
                                 if let Some(Ok(status)) = status {
                                     log::info!("Received status from {}: {:?}", device, status);
-                                    let command =
-                                        self.updater.process(&application, &device, status).await?;
+                                    if let Ok(command) =
+                                        self.updater.process(&application, &device, status).await
+                                    {
+                                        log::info!("Sending command to {}: {:?}", device, command);
 
-                                    log::info!("Sending command to {}: {:?}", device, command);
-
-                                    let topic = format!("command/{}/{}/dfu", application, device);
-                                    let message =
-                                        mqtt::Message::new(topic, serde_cbor::to_vec(&command)?, 1);
-                                    self.client.publish(message).await?;
+                                        let topic =
+                                            format!("command/{}/{}/dfu", application, device);
+                                        let message = mqtt::Message::new(
+                                            topic,
+                                            serde_cbor::to_vec(&command)?,
+                                            1,
+                                        );
+                                        if let Err(e) = self.client.publish(message).await {
+                                            log::info!(
+                                                "Error publishing command back to device: {:?}",
+                                                e
+                                            );
+                                        }
+                                    }
                                 }
                             }
                         }
