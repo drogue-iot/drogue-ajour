@@ -8,19 +8,21 @@ spec:
       name: PROJECT_PATH
       description: Path to cargo project to build
       type: string
+    - default: ""
+      name: CARGO_BUILD_ARGS
+      description: Additional arguments to pass to cargo
+      type: string
   steps:
     - command:
         - /bin/bash
         - '-c'
         - >-
           cp Dockerfile $(workspaces.input.path)/$(params.PROJECT_PATH) &&
+          ./build.sh $(workspaces.input.path)/$(params.PROJECT_PATH) $(params.CARGO_BUILD_ARGS) &&
           cd $(workspaces.input.path)/$(params.PROJECT_PATH) &&
-          git rev-parse --short HEAD | tr -d '\n' > $(results.revision.path) &&
-          REVISION=$(cat $(results.revision.path)) cargo objcopy --release -- -O binary firmware.bin &&
-          REV=$(cat $(results.revision.path)) SZ=$(du -b firmware.bin | cut -f1) SHA=$(sha256sum firmware.bin) echo "{\"version\":\"${REV}\",\"size\":\"{SZ}\",\"checksum\":\"${SHA}\"}" > firmware.json
+          git rev-parse --short HEAD | tr -d '\n' > $(results.revision.path)
       image: 'docker.io/lulf/firmware-builder:latest'
       name: build
-      resources: {}
   results:
     - name: revision
       description: Git revision

@@ -22,6 +22,10 @@ spec:
     - description: Firmware image name
       name: IMAGE
       type: string
+    - default: ""
+      name: CARGO_BUILD_ARGS
+      description: Additional arguments to pass to cargo
+      type: string
   tasks:
     - name: fetch-repository
       params:
@@ -49,11 +53,11 @@ spec:
       workspaces:
         - name: input
           workspace: build
-    - name: firmware-deploy
+    - name: firmware-publish
       params:
         - name: IMAGE
           #value: $(params.REGISTRY)/$(params.IMAGE):$(tasks.firmware-build.results.revision)
-          value: $(params.REGISTRY)/$(params.IMAGE):latest
+          value: $(params.REGISTRY)/$(params.IMAGE):$(params.GIT_REVISION)
         - name: DOCKERFILE
           value: $(workspaces.source.path)/$(params.PROJECT_PATH)/Dockerfile
         - name: CONTEXT
