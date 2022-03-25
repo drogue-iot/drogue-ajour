@@ -1,13 +1,6 @@
-
-use anyhow::{anyhow};
-use clap::Parser;
+use anyhow::anyhow;
 
 use drogue_ajour_protocol::{Command, Status};
-
-
-
-
-
 
 use crate::index::{FirmwareSpec, Index};
 use crate::oci::OciClient;

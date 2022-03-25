@@ -1,13 +1,6 @@
-
-
-
-
-
 use drogue_client::{dialect, openid::AccessTokenProvider, Section, Translator};
 
-
 use serde::{Deserialize, Serialize};
-
 
 pub type DrogueClient = drogue_client::registry::v1::Client<AccessTokenProvider>;
 

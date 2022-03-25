@@ -1,13 +1,8 @@
-
-
-
 use cloudevents::{event::AttributeValue, Data, Event};
-use drogue_ajour_protocol::{Status};
+use drogue_ajour_protocol::Status;
 
-use futures::{stream::StreamExt, TryFutureExt};
+use futures::stream::StreamExt;
 use paho_mqtt as mqtt;
-
-
 
 use crate::updater::Updater;
 

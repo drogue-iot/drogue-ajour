@@ -1,10 +1,9 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use anyhow::{Context};
+use anyhow::Context;
 use clap::Parser;
 
-
-use drogue_client::{openid::AccessTokenProvider};
-use futures::{stream::StreamExt, TryFutureExt};
+use drogue_client::openid::AccessTokenProvider;
+use futures::TryFutureExt;
 use paho_mqtt as mqtt;
 
 use std::time::Duration;
