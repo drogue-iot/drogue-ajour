@@ -2,7 +2,7 @@ use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use cloudevents::{event::AttributeValue, Data, Event};
-use drogue_ajour_protocol::{Command, CommandRef, Status};
+use drogue_ajour_protocol::{Command, Status};
 use futures::{stream::StreamExt, TryFutureExt};
 use oci_distribution::{client, secrets::RegistryAuth};
 use paho_mqtt as mqtt;
@@ -15,6 +15,7 @@ use std::time::Duration;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Metadata {
     pub version: String,
+    pub checksum: String,
     pub size: String,
 }
 
@@ -31,17 +32,17 @@ impl Updater {
     pub fn new(index: Index, oci: OciClient) -> Self {
         Self { oci, index }
     }
-    pub async fn process<'m>(
+    pub async fn process(
         &mut self,
         application: &str,
         _device: &str,
-        status: Status<'m>,
+        status: Status,
     ) -> Result<Command, anyhow::Error> {
         if let Some(image) = self.index.latest_version(application) {
             match self.oci.fetch_metadata(&image).await {
                 Ok(metadata) => {
                     if status.version == metadata.version {
-                        Ok(CommandRef::new_sync(&status.version, None).into())
+                        Ok(Command::new_sync(&status.version, None))
                     } else {
                         let mut offset = 0;
                         let mut mtu = 512;
@@ -65,12 +66,10 @@ impl Updater {
                                 offset,
                                 block.len()
                             );
-                            Ok(
-                                CommandRef::new_write(&metadata.version, offset as u32, block)
-                                    .into(),
-                            )
+                            Ok(Command::new_write(&metadata.version, offset as u32, block))
                         } else {
-                            Ok(CommandRef::new_swap(&metadata.version, &[]).into())
+                            let data = hex::decode(&metadata.checksum)?;
+                            Ok(Command::new_swap(&metadata.version, data
                         }
                     }
                 }
@@ -202,9 +201,9 @@ struct Args {
     #[clap(long)]
     token: String,
 
-    /// Allow insecure TLS configuration
+    /// Path to CA
     #[clap(long)]
-    tls_insecure: bool,
+    ca_path: Option<String>,
 
     /// Disable TLS
     #[clap(long)]
@@ -249,12 +248,11 @@ async fn main() -> anyhow::Result<()> {
     conn_opts.automatic_reconnect(Duration::from_millis(100), Duration::from_secs(5));
 
     if !args.disable_tls {
-        conn_opts.ssl_options(
-            mqtt::SslOptionsBuilder::new()
-                .enable_server_cert_auth(false)
-                .verify(false)
-                .finalize(),
-        );
+        let ca = args
+            .ca_path
+            .unwrap_or("/etc/ssl/certs/ca-bundle.crt".to_string());
+        let ssl_opts = mqtt::SslOptionsBuilder::new().trust_store(&ca)?.finalize();
+        conn_opts.ssl_options(ssl_opts);
     }
 
     let conn_opts = conn_opts.finalize();

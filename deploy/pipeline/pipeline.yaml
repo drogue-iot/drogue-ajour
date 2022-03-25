@@ -4,21 +4,16 @@ metadata:
   name: oci-firmware
 spec:
   params:
-    - default: 'https://github.com/drogue-iot/burrboard'
-      description: Firmware repository
+    - description: Firmware repository
       name: GIT_REPO
       type: string
     - default: main
       description: Revision
       name: GIT_REVISION
       type: string
-    - default: image-registry.openshift-image-registry.svc:5000/drogue-firmware
+    - default: image-registry.openshift-image-registry.svc:5000/
       description: Firmware image name
       name: REGISTRY
-      type: string
-    - default: burrboard
-      description: Firmware name
-      name: FIRMWARE_NAME
       type: string
   tasks:
     - name: fetch-repository
@@ -49,9 +44,9 @@ spec:
         - name: IMAGE
           value: $(params.REGISTRY)/$(params.FIRMWARE_NAME):$(tasks.firmware-build.results.revision)
         - name: DOCKERFILE
-          value: $(workspaces.source.path)/firmware/application/Dockerfile
+          value: $(workspaces.source.path)/Dockerfile
         - name: CONTEXT
-          value: $(workspaces.source.path)/firmware/application
+          value: $(workspaces.source.path)
         - name: BUILD_EXTRA_ARGS
           value: --label io.drogue.metadata="`cat $(workspaces.source.path)/firmware/application/firmware.json`"
       runAfter:
