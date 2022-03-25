@@ -12,6 +12,7 @@ spec:
       labels:
         app: drogue-ajour
     spec:
+      serviceAccountName: builder
       containers:
       - name: endpoint
         image: quay.io/lulf0/drogue-ajour:latest
