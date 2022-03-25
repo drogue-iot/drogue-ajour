@@ -39,7 +39,7 @@ impl Updater {
                                 }
                             }
 
-                            if offset < metadata.size.parse::<usize>().unwrap() {
+                            if offset < metadata.size as usize {
                                 let firmware = self.oci.fetch_firmware(&image).await?;
 
                                 let to_copy = core::cmp::min(firmware.len() - offset, mtu);

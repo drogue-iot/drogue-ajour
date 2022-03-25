@@ -16,7 +16,7 @@ pub struct OciClient {
 pub struct Metadata {
     pub version: String,
     pub checksum: String,
-    pub size: String,
+    pub size: u32,
 }
 
 impl OciClient {
