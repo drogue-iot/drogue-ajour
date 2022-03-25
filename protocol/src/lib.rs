@@ -61,7 +61,7 @@ pub use owned::*;
 
 #[cfg(feature = "std")]
 mod owned {
-    use super::{Sha256, StatusRef};
+    use super::{CommandRef, Sha256, StatusRef};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -105,6 +105,30 @@ mod owned {
                 version: version.to_string(),
                 offset,
                 data: data.to_vec(),
+            }
+        }
+    }
+
+    impl<'a> From<CommandRef<'a>> for Command {
+        fn from(r: CommandRef<'a>) -> Self {
+            match r {
+                CommandRef::Sync { version, poll } => Command::Sync {
+                    version: version.to_string(),
+                    poll,
+                },
+                CommandRef::Write {
+                    version,
+                    offset,
+                    data,
+                } => Command::Write {
+                    version: version.to_string(),
+                    offset,
+                    data: data.to_vec(),
+                },
+                CommandRef::Swap { version, checksum } => Command::Swap {
+                    version: version.to_string(),
+                    checksum,
+                },
             }
         }
     }

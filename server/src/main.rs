@@ -69,7 +69,7 @@ impl Updater {
                             Ok(Command::new_write(&metadata.version, offset as u32, block))
                         } else {
                             let data = hex::decode(&metadata.checksum)?;
-                            Ok(Command::new_swap(&metadata.version, data
+                            Ok(Command::new_swap(&metadata.version, &data))
                         }
                     }
                 }
@@ -345,7 +345,7 @@ impl Server {
                                 let status: Option<Result<Status, anyhow::Error>> =
                                     e.data().map(|d| match d {
                                         Data::Binary(b) => {
-                                            serde_json::from_slice(&b[..]).map_err(|e| e.into())
+                                            serde_cbor::from_slice(&b[..]).map_err(|e| e.into())
                                         }
                                         Data::String(s) => {
                                             serde_json::from_str(&s).map_err(|e| e.into())
@@ -365,7 +365,7 @@ impl Server {
 
                                     let topic = format!("command/{}/{}/dfu", application, device);
                                     let message =
-                                        mqtt::Message::new(topic, serde_json::to_vec(&command)?, 1);
+                                        mqtt::Message::new(topic, serde_cbor::to_vec(&command)?, 1);
                                     self.client.publish(message).await?;
                                 }
                             }
