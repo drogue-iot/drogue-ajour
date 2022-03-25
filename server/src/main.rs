@@ -23,6 +23,10 @@ struct Args {
     #[clap(long)]
     oci_registry_prefix: String,
 
+    /// Prefix to use for container registry storing images
+    #[clap(long)]
+    oci_registry_tls: bool,
+
     /// Token to use for authenticating to registry
     #[clap(long)]
     oci_registry_token: Option<String>,
@@ -31,7 +35,7 @@ struct Args {
     #[clap(long)]
     oci_registry_user: Option<String>,
 
-    /// Token to use for authenticating to registry
+    /// Do not require registry to be valid cert and host
     #[clap(long)]
     oci_registry_insecure: bool,
 
@@ -84,7 +88,11 @@ async fn main() -> anyhow::Result<()> {
 
     let oci_client = oci::OciClient::new(
         oci::ClientConfig {
-            protocol: oci::ClientProtocol::Https,
+            protocol: if args.oci_registry_tls {
+                oci::ClientProtocol::Https
+            } else {
+                oci::ClientProtocol::Http
+            },
             accept_invalid_hostnames: args.oci_registry_insecure,
             accept_invalid_certificates: args.oci_registry_insecure,
             extra_root_certificates: Vec::new(),

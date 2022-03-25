@@ -24,6 +24,11 @@ spec:
               secretKeyRef:
                 name: container-registry
                 key: prefix
+          - name: OCI_REGISTRY_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: container-registry
+                key: token
           - name: DROGUE_APPLICATION
             valueFrom:
               secretKeyRef:

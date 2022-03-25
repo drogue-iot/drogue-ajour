@@ -24,6 +24,7 @@ impl Updater {
             match spec {
                 FirmwareSpec::OCI { image } => match self.oci.fetch_metadata(&image).await {
                     Ok(metadata) => {
+                        log::info!("Got metadata: {:?}", metadata);
                         if status.version == metadata.version {
                             Ok(Command::new_sync(&status.version, None))
                         } else {
