@@ -6,7 +6,16 @@ You can run Drogue Ajour locally or on Kubernetes (recommended for production).
 
 ## Architecture
 
-Drogue Ajour uses the Drogue IoT Cloud event stream and command API to communicate with devices that have firmware update capability. The Drogue IoT device registry is used to store the 'desired' firmware and version for a given device.
+Drogue Ajour uses the Drogue IoT Cloud event stream and command API to communicate with devices that have firmware update capability. The Drogue IoT device registry is used to store the 'desired' firmware and version for a given device. The `Application` and `Device` objects need to use an extended schema as follows:
+
+```
+spec:
+  firmware:
+    oci:
+      image: 'image-within-repo:1234'
+```
+
+If defined at the `Application` it will apply to all devices unless there is a per device property, in which case that will override the application level property.
 
 As a reference architecture, Drogue Ajour uses an Open Container Initiative (OCI) registry to store container images with the device firmware. This allows reusing existing infrastructure commonly used in Kubernetes. However, the goal is
 to support alternatives like Eclipse Hawkbit for storing the firmware.
