@@ -1,5 +1,5 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use clap::Parser;
 
 use drogue_client::openid::AccessTokenProvider;
@@ -43,14 +43,18 @@ struct Args {
     #[clap(long)]
     mqtt_uri: String,
 
+    /// Mqtt group id for shared subscription (for horizontal scaling)
+    #[clap(long)]
+    mqtt_group_id: Option<String>,
+
     /// Device registry URL
     /// Mqtt server uri (tcp://host:port)
     #[clap(long)]
     device_registry: String,
 
-    /// Name of application to manage firmware updates for
+    /// Name of specific application to manage firmware updates for (will use all accessible from service account by default)
     #[clap(long)]
-    application: String,
+    application: Option<String>,
 
     /// Token for authenticating ajour to Drogue IoT
     #[clap(long)]
@@ -104,7 +108,6 @@ async fn main() -> anyhow::Result<()> {
 
     let mqtt_uri = args.mqtt_uri;
     let token = args.token;
-    let application = args.application;
 
     let mqtt_opts = mqtt::CreateOptionsBuilder::new()
         .server_uri(mqtt_uri)
@@ -120,7 +123,6 @@ async fn main() -> anyhow::Result<()> {
 
     let url = reqwest::Url::parse(&args.device_registry)?;
     let drg = index::DrogueClient::new(reqwest::Client::new(), url, tp);
-    let index = index::Index::new(drg);
 
     let mut conn_opts = mqtt::ConnectOptionsBuilder::new();
     conn_opts.user_name(args.user);
@@ -151,8 +153,6 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Failed to connect to MQTT endpoint")?;
 
-    let updater = updater::Updater::new(index, oci_client);
-
     let healthz = if !args.disable_health {
         Some(
             HttpServer::new(move || App::new().route("/healthz", web::get().to(healthz)))
@@ -163,7 +163,29 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
-    let mut app = server::Server::new(mqtt_client, application, updater);
+    let mut applications = Vec::new();
+    if let Some(app) = args.application {
+        applications.push(app);
+    } else {
+        let apps: Option<Vec<drogue_client::registry::v1::Application>> = drg.list_apps().await?;
+        if let Some(apps) = apps {
+            for app in apps {
+                applications.push(app.metadata.name);
+            }
+        } else {
+            return Err(anyhow!("no applications available"));
+        }
+    }
+
+    log::info!(
+        "Starting server subscribing to applications: {:?}",
+        applications
+    );
+
+    let index = index::Index::new(drg);
+    let updater = updater::Updater::new(index, oci_client);
+
+    let mut app = server::Server::new(mqtt_client, args.mqtt_group_id, applications, updater);
 
     if let Some(h) = healthz {
         futures::try_join!(app.run(), h.err_into())?;

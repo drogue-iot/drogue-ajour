@@ -8,23 +8,36 @@ use crate::updater::Updater;
 
 pub struct Server {
     client: mqtt::AsyncClient,
-    application: String,
+    group_id: Option<String>,
+    applications: Vec<String>,
     updater: Updater,
 }
 
 impl Server {
-    pub fn new(client: mqtt::AsyncClient, application: String, updater: Updater) -> Self {
+    pub fn new(
+        client: mqtt::AsyncClient,
+        group_id: Option<String>,
+        applications: Vec<String>,
+        updater: Updater,
+    ) -> Self {
         Self {
             client,
-            application,
+            group_id,
+            applications,
             updater,
         }
     }
 
     pub async fn run(&mut self) -> Result<(), anyhow::Error> {
         let mut stream = self.client.get_stream(100);
-        self.client
-            .subscribe(format!("app/{}", &self.application), 1);
+        for application in self.applications.iter() {
+            if let Some(group_id) = &self.group_id {
+                self.client
+                    .subscribe(format!("$share/{}/app/{}", &group_id, &application), 1);
+            } else {
+                self.client.subscribe(format!("app/{}", &application), 1);
+            }
+        }
         loop {
             if let Some(m) = stream.next().await {
                 if let Some(m) = m {

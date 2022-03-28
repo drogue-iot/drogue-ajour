@@ -30,11 +30,6 @@ spec:
               secretKeyRef:
                 name: container-registry
                 key: token
-          - name: DROGUE_APPLICATION
-            valueFrom:
-              secretKeyRef:
-                name: drogue-config
-                key: application
           - name: DROGUE_TOKEN
             valueFrom:
               secretKeyRef:
@@ -55,6 +50,8 @@ spec:
               secretKeyRef:
                 name: drogue-config
                 key: mqtt-integration
+          - name: MQTT_GROUP_ID
+            value: "drogue-ajour"
         ports:
         - containerPort: 8080
         livenessProbe:

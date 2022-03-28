@@ -855,8 +855,7 @@ dependencies = [
 [[package]]
 name = "drogue-client"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a25e4e6cba4cf03d9f8f5b5b69a5e1f289e7c12d888cd757589978094ebbff8d"
+source = "git+https://github.com/drogue-iot/drogue-client.git?rev=d69148b1678a6287b17ff38f25db0ef652f65cfd#d69148b1678a6287b17ff38f25db0ef652f65cfd"
 dependencies = [
  "async-std",
  "async-trait",
