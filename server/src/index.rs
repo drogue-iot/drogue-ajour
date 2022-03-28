@@ -11,10 +11,26 @@ pub struct Index {
 
 dialect!(FirmwareSpec [Section::Spec => "firmware"]);
 
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+pub enum ImagePullPolicy {
+    Always,
+    IfNotPresent,
+}
+
+impl Default for ImagePullPolicy {
+    fn default() -> Self {
+        Self::IfNotPresent
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub enum FirmwareSpec {
     #[serde(rename = "oci")]
-    OCI { image: String },
+    OCI {
+        image: String,
+        #[serde(rename = "imagePullPolicy", default = "Default::default")]
+        image_pull_policy: ImagePullPolicy,
+    },
     #[serde(rename = "hawkbit")]
     HAWKBIT,
 }
@@ -30,7 +46,6 @@ impl Index {
     ) -> Result<Option<FirmwareSpec>, anyhow::Error> {
         // Check if we got a device on the device first
         if let Some(device) = self.client.get_device(application, device).await? {
-            log::info!("WE GOT DEVICE {:?}", device);
             if let Some(spec) = device.section::<FirmwareSpec>() {
                 return Ok(Some(spec?));
             }

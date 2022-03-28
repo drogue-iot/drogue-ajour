@@ -22,7 +22,10 @@ impl Updater {
     ) -> Result<Command, anyhow::Error> {
         if let Some(spec) = self.index.latest_version(application, device).await? {
             match spec {
-                FirmwareSpec::OCI { image } => match self.oci.fetch_metadata(&image).await {
+                FirmwareSpec::OCI {
+                    image,
+                    image_pull_policy,
+                } => match self.oci.fetch_metadata(&image, image_pull_policy).await {
                     Ok(metadata) => {
                         log::debug!("Got metadata: {:?}", metadata);
                         if status.version == metadata.version {
@@ -40,7 +43,10 @@ impl Updater {
                             }
 
                             if offset < metadata.size as usize {
-                                let firmware = self.oci.fetch_firmware(&image).await?;
+                                let firmware = self
+                                    .oci
+                                    .fetch_firmware(&image, &metadata, image_pull_policy)
+                                    .await?;
 
                                 let to_copy = core::cmp::min(firmware.len() - offset, mtu);
                                 let block = &firmware[offset..offset + to_copy];

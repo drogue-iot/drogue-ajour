@@ -19,4 +19,6 @@ if [ "${DROGUE_APPLICATION}" != "" ]; then
     ARGS="${ARGS} --application ${DROGUE_APPLICATION}"
 fi
 
+ARGS="${ARGS} --exclude-applications lulf-drogue-1"
+
 /drogue-ajour ${ARGS}
