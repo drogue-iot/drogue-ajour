@@ -45,7 +45,7 @@ impl OciClient {
                 .unwrap_or(RegistryAuth::Anonymous),
             metadata_cache: LruCache::new(cache_size),
             firmware_cache: LruCache::new(cache_size),
-            metadata_cache_expiry: metadata_cache_expiry,
+            metadata_cache_expiry,
         }
     }
 
@@ -63,6 +63,8 @@ impl OciClient {
                     if inserted > &oldest {
                         log::debug!("Found metadata cache entry for {}", image);
                         return Ok(entry.clone());
+                    } else {
+                        log::debug!("Found expired entry for {}, fetching new", image);
                     }
                 } else {
                     log::debug!("Found metadata cache entry for {}", image);
