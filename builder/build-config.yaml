@@ -11,6 +11,10 @@ spec:
     contextDir: 'builder'
   strategy:
     type: Docker
+  output:
+    to:
+      kind: "ImageStreamTag"
+      name: "firmware-builder:latest"
   triggers:
     - type: ImageChange
       imageChange: {}

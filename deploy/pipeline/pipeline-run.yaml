@@ -10,10 +10,8 @@ spec:
       value: main
     - name: PROJECT_PATH
       value: .
-    - name: REGISTRY
-      value: 'image-registry.openshift-image-registry.svc:5000'
     - name: IMAGE
-      value: drogue-ajour/dfu-workshop
+      value: dfu-workshop
   pipelineRef:
     name: oci-firmware
   serviceAccountName: pipeline

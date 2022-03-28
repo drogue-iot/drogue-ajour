@@ -15,10 +15,14 @@ spec:
       name: PROJECT_PATH
       description: Path to cargo project to build
       type: string
-    - default: image-registry.openshift-image-registry.svc:5000
+    - default: image-registry.openshift-image-registry.svc:5000/drogue-ajour
       description: Registry for image
       name: REGISTRY
       type: string
+    - name: BUILDER_IMAGE
+      description: Firmware builder image
+      type: string
+      default: image-registry.openshift-image-registry.svc:5000/drogue-ajour/firmware-builder:latest
     - description: Firmware image name
       name: IMAGE
       type: string
@@ -45,6 +49,8 @@ spec:
       params:
         - name: PROJECT_PATH
           value: $(params.PROJECT_PATH)
+        - name: BUILDER_IMAGE
+          value: $(params.BUILDER_IMAGE)
       runAfter:
         - fetch-repository
       taskRef:

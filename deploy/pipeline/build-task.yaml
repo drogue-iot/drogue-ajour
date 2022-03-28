@@ -12,6 +12,9 @@ spec:
       name: CARGO_BUILD_ARGS
       description: Additional arguments to pass to cargo
       type: string
+    - name: BUILDER_IMAGE
+      description: Firmware builder image
+      type: string
   steps:
     - command:
         - /bin/bash
@@ -21,7 +24,7 @@ spec:
           ./build.sh $(workspaces.input.path)/$(params.PROJECT_PATH) $(params.CARGO_BUILD_ARGS) &&
           cd $(workspaces.input.path)/$(params.PROJECT_PATH) &&
           git rev-parse --short HEAD | tr -d '\n' > $(results.revision.path)
-      image: 'docker.io/lulf/firmware-builder:latest'
+      image: $(params.BUILDER_IMAGE)
       name: build
   results:
     - name: revision
