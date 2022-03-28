@@ -6,6 +6,7 @@ use oci_distribution::{client, secrets::RegistryAuth};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::Read;
+use tokio::time::{Duration, Instant};
 
 pub struct OciClient {
     prefix: String,
@@ -13,7 +14,8 @@ pub struct OciClient {
     client: client::Client,
 
     // Cache of metadata
-    metadata_cache: LruCache<String, Metadata>,
+    metadata_cache: LruCache<String, (Instant, Metadata)>,
+    metadata_cache_expiry: Option<Duration>,
 
     // Cached by checksum
     firmware_cache: LruCache<String, Vec<u8>>,
@@ -33,6 +35,7 @@ impl OciClient {
         user: Option<String>,
         token: Option<String>,
         cache_size: usize,
+        metadata_cache_expiry: Option<Duration>,
     ) -> Self {
         Self {
             client: client::Client::new(config),
@@ -42,6 +45,7 @@ impl OciClient {
                 .unwrap_or(RegistryAuth::Anonymous),
             metadata_cache: LruCache::new(cache_size),
             firmware_cache: LruCache::new(cache_size),
+            metadata_cache_expiry: metadata_cache_expiry,
         }
     }
 
@@ -52,9 +56,18 @@ impl OciClient {
     ) -> Result<Metadata, anyhow::Error> {
         if let ImagePullPolicy::IfNotPresent = image_pull_policy {
             // Attempt cache lookup
-            if let Some(entry) = self.metadata_cache.get(image) {
-                log::debug!("Found metadata cache entry for {}", image);
-                return Ok(entry.clone());
+            if let Some((inserted, entry)) = self.metadata_cache.get(image) {
+                // Discard outdated items, let the LRU logic clean them out eventually
+                if let Some(expiry) = self.metadata_cache_expiry {
+                    let oldest = Instant::now() - expiry;
+                    if inserted > &oldest {
+                        log::debug!("Found metadata cache entry for {}", image);
+                        return Ok(entry.clone());
+                    }
+                } else {
+                    log::debug!("Found metadata cache entry for {}", image);
+                    return Ok(entry.clone());
+                }
             }
         }
         let manifest = self
@@ -66,7 +79,8 @@ impl OciClient {
                 let val: Value = serde_json::from_str(&config)?;
                 if let Some(annotation) = val["config"]["Labels"]["io.drogue.metadata"].as_str() {
                     let metadata: Metadata = serde_json::from_str(&annotation)?;
-                    self.metadata_cache.put(image.to_string(), metadata.clone());
+                    self.metadata_cache
+                        .put(image.to_string(), (Instant::now(), metadata.clone()));
                     Ok(metadata)
                 } else {
                     Err(anyhow!("Unable to locate metadata in image config"))

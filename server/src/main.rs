@@ -42,6 +42,9 @@ struct Args {
     #[clap(long, default_value_t = 50)]
     oci_cache_entries_max: usize,
 
+    #[clap(long)]
+    oci_cache_expiry: Option<u64>,
+
     /// Mqtt server uri (tcp://host:port)
     #[clap(long)]
     mqtt_uri: String,
@@ -112,6 +115,7 @@ async fn main() -> anyhow::Result<()> {
         args.oci_registry_user.clone(),
         args.oci_registry_token.clone(),
         args.oci_cache_entries_max,
+        args.oci_cache_expiry.map(|s| Duration::from_secs(s)),
     );
 
     let mqtt_uri = args.mqtt_uri;
