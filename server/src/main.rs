@@ -56,6 +56,10 @@ struct Args {
     #[clap(long)]
     application: Option<String>,
 
+    /// Exclude a comma-separated list of applications from ajour processing
+    #[clap(long)]
+    exclude_applications: Option<String>,
+
     /// Token for authenticating ajour to Drogue IoT
     #[clap(long)]
     token: String,
@@ -163,6 +167,11 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    let excluded: Vec<String> = if let Some(excluded) = args.exclude_applications {
+        excluded.split(",").map(|s| s.to_string()).collect()
+    } else {
+        Vec::new()
+    };
     let mut applications = Vec::new();
     if let Some(app) = args.application {
         applications.push(app);
@@ -170,7 +179,9 @@ async fn main() -> anyhow::Result<()> {
         let apps: Option<Vec<drogue_client::registry::v1::Application>> = drg.list_apps().await?;
         if let Some(apps) = apps {
             for app in apps {
-                applications.push(app.metadata.name);
+                if !excluded.contains(&app.metadata.name) {
+                    applications.push(app.metadata.name);
+                }
             }
         } else {
             return Err(anyhow!("no applications available"));
