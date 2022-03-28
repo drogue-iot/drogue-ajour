@@ -1,0 +1,17 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: firmware-builder
+spec:
+  source:
+    git:
+      ref: main
+      uri: 'https://github.com/drogue-iot/drogue-ajour.git'
+    type: Git
+    contextDir: 'builder'
+  strategy:
+    type: Docker
+  triggers:
+    - type: ImageChange
+      imageChange: {}
+    - type: ConfigChange
