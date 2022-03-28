@@ -7,7 +7,7 @@ CARGO_BUILD_ARGS=$2
 pushd ${PROJECT}
 REVISION=$(git rev-parse --short HEAD | tr -d '\n')
 echo "Building firmware"
-cargo build --release ${CARGO_BUILD_ARGS}
+REVISION=${REVISION} cargo build --release ${CARGO_BUILD_ARGS}
 
 echo "Creating binary file"
 cargo objcopy --release ${CARGO_BUILD_ARGS} -- -O binary firmware.bin
