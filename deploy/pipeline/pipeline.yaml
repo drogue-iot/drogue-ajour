@@ -51,6 +51,8 @@ spec:
           value: $(params.PROJECT_PATH)
         - name: BUILDER_IMAGE
           value: $(params.BUILDER_IMAGE)
+        - name: CARGO_BUILD_ARGS
+          value: $(params.CARGO_BUILD_ARGS)
       runAfter:
         - fetch-repository
       taskRef:
