@@ -56,6 +56,7 @@ A typical firmware update cycle runs as follows:
 ```
 {
    "version": "0.1.0",
+   "correlation_id": 1 // Optional: Opaque request identifier, for devices that aggregate multiple updates
    "mtu": 512, // Optional: The desired block size to use for firmware blobs
 }
 ```
@@ -70,6 +71,7 @@ This allows the Drogue Ajour to check if an update is necessary at all.
 {
   "sync": {
     "version": "0.1.0", // Desired firmware version
+    "correlation_id": 1 // Optional: Should be set to the id from the device status
     "poll": 300, // The amount of time to wait before checking in again
   }
 }

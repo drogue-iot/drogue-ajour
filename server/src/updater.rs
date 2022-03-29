@@ -45,7 +45,11 @@ impl Updater {
                         log::debug!("Got metadata: {:?}", metadata);
 
                         if status.version == metadata.version {
-                            Ok(Command::new_sync(&status.version, None))
+                            Ok(Command::new_sync(
+                                &status.version,
+                                None,
+                                status.correlation_id,
+                            ))
                         } else {
                             let mut offset = 0;
                             let mut mtu = 512;
@@ -72,10 +76,19 @@ impl Updater {
                                     offset,
                                     block.len()
                                 );
-                                Ok(Command::new_write(&metadata.version, offset as u32, block))
+                                Ok(Command::new_write(
+                                    &metadata.version,
+                                    offset as u32,
+                                    block,
+                                    status.correlation_id,
+                                ))
                             } else {
                                 let data = hex::decode(&metadata.checksum)?;
-                                Ok(Command::new_swap(&metadata.version, &data))
+                                Ok(Command::new_swap(
+                                    &metadata.version,
+                                    &data,
+                                    status.correlation_id,
+                                ))
                             }
                         }
                     }
