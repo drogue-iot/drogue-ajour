@@ -1,0 +1,12 @@
+{
+  "name": "drogue-device-simulator",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@patternfly/patternfly": "^4.179.1",
+    "@fortawesome/fontawesome-free": "^6.0.0"
+  }
+}

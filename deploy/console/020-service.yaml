@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: drogue-ajour-console
+  labels:
+    app.kubernetes.io/name: drogue-ajour
+    app.kubernetes.io/instance: ajour
+    app.kubernetes.io/component: console
+spec:
+  selector:
+    app.kubernetes.io/name: drogue-ajour
+    app.kubernetes.io/instance: ajour
+    app.kubernetes.io/component: console
+  ports:
+    - port: 8080
+      name: web
+      targetPort: web
