@@ -12,6 +12,7 @@ chrono = "0.4"
 float-cmp = "0.9"
 futures = "0.3"
 gloo-storage = "0.2"
+drogue-client = "0.9"
 gloo-timers = { version = "0.2", features = ["futures"] }
 gloo-utils = "0.1"
 humantime = "2"
@@ -62,6 +63,7 @@ env_logger = "0.9"
 
 [patch.crates-io]
 patternfly-yew = { git = "https://github.com/ctron/patternfly-yew", rev = "c45eaae43ba8c79cb1c1840deaa3138b7a05579b" }
+drogue-client = { git = "https://github.com/drogue-iot/drogue-client.git", branch = "main" }
 
 [features]
 default = []
