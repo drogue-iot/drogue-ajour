@@ -30,7 +30,5 @@ jobs:
       - name: Build and push images
         uses: docker/build-push-action@v2
         with:
-          context: .
-          tags: |
-						ghcr.io/drogue-iot/drogue-ajour:latest
+          tags: ghcr.io/drogue-iot/drogue-ajour:latest
           push: ${{ github.ref == 'refs/heads/main' }}
