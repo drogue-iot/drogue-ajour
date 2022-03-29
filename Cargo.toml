@@ -6,4 +6,4 @@ members = [
 resolver = "2"
 
 [patch.crates-io]
-drogue-client = { git = "https://github.com/drogue-iot/drogue-client.git", rev = "d69148b1678a6287b17ff38f25db0ef652f65cfd" }
+drogue-client = { git = "https://github.com/drogue-iot/drogue-client.git", branch = "main" }
