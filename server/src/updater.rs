@@ -2,7 +2,7 @@ use anyhow::anyhow;
 
 use drogue_ajour_protocol::{Command, Status};
 
-use crate::index::{FirmwareSpec, Index};
+use crate::index::{FirmwareSpec, FirmwareStatus, Index};
 use crate::oci::OciClient;
 
 pub struct Updater {
@@ -27,7 +27,23 @@ impl Updater {
                     image_pull_policy,
                 } => match self.oci.fetch_metadata(&image, image_pull_policy).await {
                     Ok(metadata) => {
+                        // Update firmware status
+                        let firmware_status = FirmwareStatus::new(&status, &metadata);
+                        if let Err(e) = self
+                            .index
+                            .update_state(application, device, firmware_status)
+                            .await
+                        {
+                            log::warn!(
+                                "Error updating status of device {}/{}: {:?}",
+                                application,
+                                device,
+                                e
+                            );
+                        }
+
                         log::debug!("Got metadata: {:?}", metadata);
+
                         if status.version == metadata.version {
                             Ok(Command::new_sync(&status.version, None))
                         } else {
@@ -63,7 +79,22 @@ impl Updater {
                             }
                         }
                     }
-                    Err(e) => Err(e.into()),
+                    Err(e) => {
+                        let firmware_status = FirmwareStatus::error(&status, e.to_string());
+                        if let Err(e) = self
+                            .index
+                            .update_state(application, device, firmware_status)
+                            .await
+                        {
+                            log::warn!(
+                                "Error updating status of device {}/{}: {:?}",
+                                application,
+                                device,
+                                e
+                            );
+                        }
+                        Err(e.into())
+                    }
                 },
                 FirmwareSpec::HAWKBIT => {
                     todo!("hawkbit firmware spec no yet supported")

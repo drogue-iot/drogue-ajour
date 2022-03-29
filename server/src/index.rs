@@ -1,5 +1,7 @@
 use drogue_client::{dialect, openid::AccessTokenProvider, Section, Translator};
 
+use crate::oci::Metadata;
+use drogue_ajour_protocol::Status;
 use serde::{Deserialize, Serialize};
 
 pub type DrogueClient = drogue_client::registry::v1::Client<AccessTokenProvider>;
@@ -8,8 +10,6 @@ pub type DrogueClient = drogue_client::registry::v1::Client<AccessTokenProvider>
 pub struct Index {
     client: DrogueClient,
 }
-
-dialect!(FirmwareSpec [Section::Spec => "firmware"]);
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum ImagePullPolicy {
@@ -23,6 +23,8 @@ impl Default for ImagePullPolicy {
     }
 }
 
+dialect!(FirmwareSpec [Section::Spec => "firmware"]);
+
 #[derive(Serialize, Deserialize, Debug)]
 pub enum FirmwareSpec {
     #[serde(rename = "oci")]
@@ -33,6 +35,65 @@ pub enum FirmwareSpec {
     },
     #[serde(rename = "hawkbit")]
     HAWKBIT,
+}
+
+dialect!(FirmwareStatus [Section::Status => "firmware"]);
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FirmwareStatus {
+    state: FirmwareStatusState,
+    current: String,
+    target: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum FirmwareStatusState {
+    /// Device is up to date with latest version
+    InSync,
+    /// Device update is in progress
+    InProgress {
+        /// Number between 0 and 100 indicating how far in the update process
+        progress: f32,
+    },
+    /// Device is out of date
+    OutOfDate,
+    /// Error during update
+    Error { description: String },
+}
+
+impl FirmwareStatus {
+    pub fn error(status: &Status, error: String) -> Self {
+        Self {
+            state: FirmwareStatusState::Error { description: error },
+            current: status.version.clone(),
+            target: String::new(),
+        }
+    }
+
+    pub fn new(status: &Status, metadata: &Metadata) -> Self {
+        if status.version == metadata.version {
+            Self {
+                state: FirmwareStatusState::InSync,
+                current: status.version.clone(),
+                target: metadata.version.clone(),
+            }
+        } else {
+            if let Some(update) = &status.update {
+                let progress = update.offset as f32 / metadata.size as f32;
+                Self {
+                    state: FirmwareStatusState::InProgress { progress },
+                    current: status.version.clone(),
+                    target: metadata.version.clone(),
+                }
+            } else {
+                Self {
+                    state: FirmwareStatusState::OutOfDate,
+                    current: status.version.clone(),
+                    target: metadata.version.clone(),
+                }
+            }
+        }
+    }
 }
 
 impl Index {
@@ -59,5 +120,18 @@ impl Index {
             }
         }
         Ok(None)
+    }
+
+    pub async fn update_state(
+        &self,
+        application: &str,
+        device: &str,
+        status: FirmwareStatus,
+    ) -> Result<(), anyhow::Error> {
+        if let Some(mut device) = self.client.get_device(application, device).await? {
+            device.set_section::<FirmwareStatus>(status)?;
+            self.client.update_device(&device).await?;
+        }
+        Ok(())
     }
 }
