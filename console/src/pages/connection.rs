@@ -1,6 +1,6 @@
 use crate::data::{SharedDataBridge, SharedDataOps};
 use crate::pages::ApplicationPage;
-use crate::settings::{Credentials, Protocol, Settings, Target};
+use crate::settings::{Credentials, Settings, Target};
 use patternfly_yew::*;
 use std::fmt::{Display, Formatter};
 use web_sys::HtmlInputElement;
@@ -13,13 +13,10 @@ pub struct Connection {
 
     // in edit settings
     auto_connect: bool,
-    protocol: Protocol,
     url: String,
     credentials: CredentialsType,
     username: String,
     password: String,
-    application: String,
-    device: String,
 
     // refs
     refs: Refs,
@@ -76,13 +73,10 @@ impl Component for Connection {
             settings_agent,
 
             auto_connect: true,
-            protocol: Protocol::Mqtt,
             url: Default::default(),
             credentials: CredentialsType::None,
             username: Default::default(),
             password: Default::default(),
-            application: Default::default(),
-            device: Default::default(),
 
             refs: Default::default(),
         }
@@ -109,18 +103,11 @@ impl Component for Connection {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let selected_protocol = |protocol| {
-            let result = self.protocol == protocol;
-            result
-        };
         let selected_credentials = |credentials| {
             let result = self.credentials == credentials;
             result
         };
 
-        let set_protocol = ctx
-            .link()
-            .callback(|v| Msg::Set(Box::new(move |c| c.protocol = v)));
         let set_credentials = ctx
             .link()
             .callback(|v| Msg::Set(Box::new(move |c| c.credentials = v)));
@@ -138,40 +125,12 @@ impl Component for Connection {
                         <Form horizontal={[FormHorizontal]} >
                             <FormGroup
                                 required=true
-                                label={"Connection type"}>
-                                <FormSelect<Protocol> variant={SelectVariant::Single(set_protocol)} ref={self.refs.protocol.clone()}>
-                                    <FormSelectOption<Protocol> selected={selected_protocol(Protocol::Mqtt)} value={Protocol::Mqtt} description="MQTT over WebSocket"  />
-                                </FormSelect<Protocol>>
-                            </FormGroup>
-
-                            <FormGroup
-                                required=true
                                 label="URL"
                                 >
                                 <TextInput
                                     r#type="url"
                                     onchange={ctx.link().callback(|v| Msg::Set(Box::new(|c|c.url = v)))}
                                     value={self.url.clone()}
-                                />
-                            </FormGroup>
-
-                            <FormGroup
-                                label="Application"
-                                >
-                                <TextInput
-                                    r#type="text"
-                                    onchange={ctx.link().callback(|v| Msg::Set(Box::new(|c|c.application = v)))}
-                                    value={self.application.clone()}
-                                />
-                            </FormGroup>
-
-                            <FormGroup
-                                label="Device"
-                                >
-                                <TextInput
-                                    r#type="text"
-                                    onchange={ctx.link().callback(|v| Msg::Set(Box::new(|c|c.device = v)))}
-                                    value={self.device.clone()}
                                 />
                             </FormGroup>
 
@@ -231,18 +190,8 @@ impl Component for Connection {
 impl Connection {
     fn sync(&mut self) {
         self.auto_connect = self.settings.auto_connect;
-        self.protocol = self.settings.target.as_protocol();
-        if let Some(input) = self.refs.protocol.cast::<HtmlInputElement>() {
-            input.set_value(&self.protocol.to_string());
-        }
-        let (url, credentials) = match &self.settings.target {
-            Target::Http { url, credentials } | Target::Mqtt { url, credentials } => {
-                (url, credentials)
-            }
-        };
+        let (url, credentials) = (&self.settings.target.url, &self.settings.target.credentials);
         self.url = url.clone();
-        self.application = self.settings.application.clone();
-        self.device = self.settings.device.clone();
         match credentials {
             Credentials::None => {
                 self.username = Default::default();
@@ -262,8 +211,6 @@ impl Connection {
     }
 
     fn update_settings(&mut self) {
-        let protocol = self.protocol;
-
         let credentials = match self.credentials {
             CredentialsType::None => Credentials::None,
             CredentialsType::Password => Credentials::Password(self.password.clone()),
@@ -276,22 +223,9 @@ impl Connection {
         let url = self.url.clone();
         let auto_connect = self.auto_connect;
 
-        let application = self.application.clone();
-        let device = self.device.clone();
-
         self.settings_agent.update(move |settings| {
             settings.auto_connect = auto_connect;
-            settings.application = application;
-            settings.device = device;
-
-            match protocol {
-                Protocol::Http => {
-                    settings.target = Target::Http { url, credentials };
-                }
-                Protocol::Mqtt => {
-                    settings.target = Target::Mqtt { url, credentials };
-                }
-            }
+            settings.target = Target { url, credentials };
         })
     }
 }

@@ -4,11 +4,9 @@
 extern crate core;
 
 mod app;
-mod connector;
 mod data;
 mod pages;
 mod settings;
-mod simulator;
 mod utils;
 
 use crate::app::Application;

@@ -1,22 +1,11 @@
-mod add;
-mod commands;
 mod config;
 mod connection;
-mod events;
 mod overview;
-mod publish;
-mod simulation;
-mod state;
+mod status;
 
-pub use add::*;
-pub use commands::*;
-pub use config::*;
 pub use connection::*;
-pub use events::*;
 pub use overview::*;
-pub use publish::*;
-pub use simulation::*;
-pub use state::*;
+pub use status::*;
 
 use patternfly_yew::{
     Flex, FlexItem, Icon, Level, PageSection, PageSectionVariant, Popover, Size, Title,

@@ -9,26 +9,13 @@ use yew_router::prelude::*;
 
 use crate::pages;
 use crate::settings::Settings;
-use crate::simulator::{SimulatorBridge, SimulatorState};
 
 #[derive(Switch, Debug, Clone, PartialEq, Eq)]
 pub enum AppRoute {
-    #[to = "/status"]
+    #[to = "/connection"]
     Connection,
-    #[to = "/publish"]
-    Publish,
-    #[to = "/commands"]
-    Commands,
-    #[to = "/events"]
-    Events,
-    #[to = "/config"]
-    Configuration,
-    #[to = "/state"]
-    State,
-    #[to = "/add"]
-    Add,
-    #[to = "/simulation/{:id}"]
-    Simulation(String),
+    #[to = "/status"]
+    Status,
     #[to = "/!"]
     Overview,
 }
@@ -57,10 +44,7 @@ impl Component for Application {
 
 pub enum Msg {
     InitError(Toast),
-
     Settings(Settings),
-    Simulator(SimulatorState),
-
     Start,
     Stop,
 }
@@ -68,8 +52,6 @@ pub enum Msg {
 pub struct ApplicationView {
     settings: Settings,
     _settings_agent: SharedDataBridge<Settings>,
-    simulator: SimulatorBridge,
-    simulator_state: SimulatorState,
 }
 
 impl Component for ApplicationView {
@@ -94,13 +76,9 @@ impl Component for ApplicationView {
             }
         }
 
-        let simulator = SimulatorBridge::from(ctx.link(), Msg::Simulator);
-
         Self {
             settings: Default::default(),
             _settings_agent,
-            simulator,
-            simulator_state: Default::default(),
         }
     }
 
@@ -110,32 +88,13 @@ impl Component for ApplicationView {
             Msg::Settings(settings) => {
                 self.settings = settings;
             }
-            Msg::Simulator(state) => {
-                self.simulator_state = state;
-            }
-            Msg::Start => {
-                self.simulator.start();
-            }
-            Msg::Stop => {
-                self.simulator.stop();
-            }
+            Msg::Start => {}
+            Msg::Stop => {}
         }
         true
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        let mut generators: Vec<VChild<NavRouterItem<AppRoute>>> = vec![];
-
-        for (id, sim) in &self.simulator_state.simulations {
-            generators.push(html_nested!(
-                <NavRouterItem<AppRoute>
-                    to={AppRoute::Simulation(id.clone())}
-                >
-                { &sim.label }
-                </NavRouterItem<AppRoute>>
-            ));
-        }
-
         let sidebar = html_nested! {
             <PageSidebar>
                 <Nav>
@@ -143,17 +102,9 @@ impl Component for ApplicationView {
                         <NavRouterExpandable<AppRoute> title="Home" expanded=true>
                             <NavRouterItem<AppRoute> to={AppRoute::Overview}>{"Overview"}</NavRouterItem<AppRoute>>
                             <NavRouterItem<AppRoute> to={AppRoute::Connection}>{"Connection"}</NavRouterItem<AppRoute>>
-                            <NavRouterItem<AppRoute> to={AppRoute::Configuration}>{"Configuration"}</NavRouterItem<AppRoute>>
                         </NavRouterExpandable<AppRoute>>
-                        <NavRouterExpandable<AppRoute> title="Basic" expanded=true>
-                            <NavRouterItem<AppRoute> to={AppRoute::Events}>{"Events"}</NavRouterItem<AppRoute>>
-                            <NavRouterItem<AppRoute> to={AppRoute::Publish}>{"Publish"}</NavRouterItem<AppRoute>>
-                            <NavRouterItem<AppRoute> to={AppRoute::Commands}>{"Received Commands"}</NavRouterItem<AppRoute>>
-                            <NavRouterItem<AppRoute> to={AppRoute::State}>{"Internal State"}</NavRouterItem<AppRoute>>
-                        </NavRouterExpandable<AppRoute>>
-                        <NavRouterExpandable<AppRoute> title="Simulations" expanded=true>
-                            <NavRouterItem<AppRoute> to={AppRoute::Add}>{ Icon::PlusCircleIcon} <span class="pf-u-px-sm">{ "Add" }</span> </NavRouterItem<AppRoute>>
-                            { for generators.into_iter() }
+                        <NavRouterExpandable<AppRoute> title="Firmware" expanded=true>
+                            <NavRouterItem<AppRoute> to={AppRoute::Status}>{"Status"}</NavRouterItem<AppRoute>>
                         </NavRouterExpandable<AppRoute>>
                     </NavList>
                 </Nav>
@@ -164,35 +115,10 @@ impl Component for ApplicationView {
             <Logo src="images/logo.png" alt="Drogue IoT" />
         };
 
-        let tools = vec![
-            html!(
-                <div>
-                    <strong>{"State: "}</strong> { self.simulator_state.state.to_string() }
-                </div>
-            ),
-            html!(
-                <>
-                    <Button
-                        icon={Icon::Play}
-                        variant={Variant::Plain}
-                        disabled={self.simulator_state.running}
-                        onclick={ctx.link().callback(|_|Msg::Start)}
-                    />
-                    <Button
-                        icon={Icon::Pause}
-                        variant={Variant::Plain}
-                        disabled={!self.simulator_state.running}
-                        onclick={ctx.link().callback(|_|Msg::Stop)}
-                    />
-                </>
-            ),
-        ];
-
         html! (
             <Page
                 logo={logo}
                 sidebar={sidebar}
-                tools={Children::new(tools)}
                 >
                     <Router<AppRoute, ()>
                             redirect = {Router::redirect(|_|AppRoute::Overview)}
@@ -200,13 +126,7 @@ impl Component for ApplicationView {
                                 match switch {
                                     AppRoute::Overview => html!{<pages::AppPage<pages::Overview>/>},
                                     AppRoute::Connection => html!{<pages::AppPage<pages::Connection>/>},
-                                    AppRoute::Publish => html!{<pages::AppPage<pages::Publish>/>},
-                                    AppRoute::Commands => html!{<pages::AppPage<pages::Commands>/>},
-                                    AppRoute::State => html!{<pages::AppPage<pages::State>/>},
-                                    AppRoute::Events => html!{<pages::AppPage<pages::Events>/>},
-                                    AppRoute::Configuration => html!{<pages::AppPage<pages::Configuration>/>},
-                                    AppRoute::Add => html!{<pages::AppPage<pages::Add>/>},
-                                    AppRoute::Simulation(id) => html!{<pages::Simulation id={id}/>}
+                                    AppRoute::Status => html!{<pages::AppPage<pages::Status>/>},
                                 }
                             })}
                         />
@@ -236,7 +156,7 @@ fn find_config() -> Result<Option<Settings>, Toast> {
                 body: html!(
                     <Content>
                         <p>
-                            {"The simulator was opened with a provided configuration. However, that configuration could not be loaded due to the following error: "}
+                            {"The page was opened with a provided configuration. However, that configuration could not be loaded due to the following error: "}
                         </p>
                         <p>{err}</p>
                     </Content>
@@ -255,7 +175,7 @@ fn find_config() -> Result<Option<Settings>, Toast> {
                 body: html!(
                     <Content>
                         <p>
-                            {"The simulator tried to load the default configuration. However, that configuration could not parsed due the following error: "}
+                            {"The page tried to load the default configuration. However, that configuration could not parsed due the following error: "}
                         </p>
                         <p>{err}</p>
                     </Content>

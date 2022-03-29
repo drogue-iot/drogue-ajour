@@ -22,7 +22,7 @@ impl Component for Overview {
         html!(
             <PageSection fill={true}>
                 <Content>
-                    {"This is the Drogue IoT device simulator, which allows you to simulate IoT devices from your browser."}
+                    {"This is the Drogue IoT Ajour Console, which allows you to manage IoT device firmware from your browser."}
                 </Content>
             </PageSection>
         )
