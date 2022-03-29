@@ -19,7 +19,7 @@ pub struct UpdateStatusRef<'a> {
 }
 
 impl<'a> StatusRef<'a> {
-    pub fn first(version: &'a str, correlation_id: Option<u32>, mtu: Option<u32>) -> Self {
+    pub fn first(version: &'a str, mtu: Option<u32>, correlation_id: Option<u32>) -> Self {
         Self {
             version,
             mtu,
@@ -30,10 +30,10 @@ impl<'a> StatusRef<'a> {
 
     pub fn update(
         version: &'a str,
-        correlation_id: Option<u32>,
         mtu: Option<u32>,
         offset: u32,
         next_version: &'a str,
+        correlation_id: Option<u32>,
     ) -> Self {
         Self {
             version,
