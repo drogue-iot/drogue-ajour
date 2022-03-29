@@ -5,6 +5,7 @@ extern crate core;
 
 mod app;
 mod data;
+mod fetcher;
 mod pages;
 mod settings;
 mod utils;

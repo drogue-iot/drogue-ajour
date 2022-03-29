@@ -52,6 +52,8 @@ pub enum Msg {
 pub struct ApplicationView {
     settings: Settings,
     _settings_agent: SharedDataBridge<Settings>,
+
+    fetcher: ApplicationFetcher,
 }
 
 impl Component for ApplicationView {
@@ -79,6 +81,7 @@ impl Component for ApplicationView {
         Self {
             settings: Default::default(),
             _settings_agent,
+            fetcher: Default::default(),
         }
     }
 
@@ -88,8 +91,12 @@ impl Component for ApplicationView {
             Msg::Settings(settings) => {
                 self.settings = settings;
             }
-            Msg::Start => {}
-            Msg::Stop => {}
+            Msg::Start => {
+                self.fetcher.start();
+            }
+            Msg::Stop => {
+                self.fetcher.stop();
+            }
         }
         true
     }
