@@ -86,11 +86,17 @@ impl Server {
                                 log::trace!("Status decode: {:?}", status);
 
                                 if let Some(Ok(status)) = status {
-                                    log::info!("Received status from {}: {:?}", device, status);
+                                    log::info!(
+                                        "Device {}/{} running version {}",
+                                        application,
+                                        device,
+                                        status.version
+                                    );
+                                    log::debug!("Received status from {}: {:?}", device, status);
                                     if let Ok(command) =
                                         self.updater.process(&application, &device, status).await
                                     {
-                                        log::info!("Sending command to {}: {:?}", device, command);
+                                        log::debug!("Sending command to {}: {:?}", device, command);
 
                                         let topic =
                                             format!("command/{}/{}/dfu", application, device);
@@ -100,7 +106,7 @@ impl Server {
                                             1,
                                         );
                                         if let Err(e) = self.client.publish(message).await {
-                                            log::info!(
+                                            log::warn!(
                                                 "Error publishing command back to device: {:?}",
                                                 e
                                             );
