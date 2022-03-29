@@ -79,7 +79,7 @@ impl FirmwareStatus {
             }
         } else {
             if let Some(update) = &status.update {
-                let progress = update.offset as f32 / metadata.size as f32;
+                let progress = 100.0 * (update.offset as f32 / metadata.size as f32);
                 Self {
                     state: FirmwareStatusState::InProgress { progress },
                     current: status.version.clone(),
