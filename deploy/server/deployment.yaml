@@ -1,21 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: drogue-ajour
+  name: server
+  labels:
+    app.kubernetes.io/name: drogue-ajour
+    app.kubernetes.io/instance: ajour
+    app.kubernetes.io/component: server
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: drogue-ajour
+      app.kubernetes.io/name: drogue-ajour
+      app.kubernetes.io/instance: ajour
+      app.kubernetes.io/component: server
   template:
     metadata:
       labels:
-        app: drogue-ajour
+        app.kubernetes.io/name: drogue-ajour
+        app.kubernetes.io/instance: ajour
+        app.kubernetes.io/component: server
     spec:
       serviceAccountName: builder
       containers:
-      - name: endpoint
-        image: quay.io/lulf0/drogue-ajour:latest
+      - name: server
+        image: ghcr.io/drogue-iot/drogue-ajour:latest
         imagePullPolicy: Always
         env:
           - name: RUST_LOG
