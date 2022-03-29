@@ -1,21 +1,16 @@
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Context};
 use clap::Parser;
 
 use drogue_client::openid::AccessTokenProvider;
-use futures::TryFutureExt;
 use paho_mqtt as mqtt;
 
 use std::time::Duration;
 
+mod health;
 mod index;
 mod oci;
 mod server;
 mod updater;
-
-async fn healthz() -> impl Responder {
-    HttpResponse::Ok().finish()
-}
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -95,7 +90,7 @@ struct Args {
     health_port: u16,
 }
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     env_logger::init();
@@ -166,11 +161,7 @@ async fn main() -> anyhow::Result<()> {
         .context("Failed to connect to MQTT endpoint")?;
 
     let healthz = if !args.disable_health {
-        Some(
-            HttpServer::new(move || App::new().route("/healthz", web::get().to(healthz)))
-                .bind(("0.0.0.0", args.health_port))?
-                .run(),
-        )
+        Some(health::HealthServer::new(args.health_port))
     } else {
         None
     };
@@ -206,8 +197,8 @@ async fn main() -> anyhow::Result<()> {
 
     let mut app = server::Server::new(mqtt_client, args.mqtt_group_id, applications, updater);
 
-    if let Some(h) = healthz {
-        futures::try_join!(app.run(), h.err_into())?;
+    if let Some(mut h) = healthz {
+        futures::try_join!(app.run(), h.run())?;
     } else {
         app.run().await?;
     }

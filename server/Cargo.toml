@@ -5,10 +5,9 @@ edition = "2021"
 description = "A firmware management service"
 
 [dependencies]
-actix-web = "4"
 clap = { version = "3.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
-actix-rt = "2"
+hyper = { version = "0.14", features = ["full"]}
 serde = {version = "1", features = ["derive"] }
 paho-mqtt = { version = "0.10", features = ["ssl"] }
 serde_cbor = "0.11"
