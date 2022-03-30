@@ -1,3 +1,5 @@
+//! A protocol for updating firmware of embedded devices from a remote server. The protocol is not
+//! tied to any specific platform, but is designed to work with Drogue Ajour and Drogue Cloud.
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use serde::{Deserialize, Serialize};

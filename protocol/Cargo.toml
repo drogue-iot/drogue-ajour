@@ -1,6 +1,15 @@
 [package]
 name = "drogue-ajour-protocol"
 version = "0.1.0"
+authors = ["Ulf Lilleengen <lulf@redhat.com>"]
+edition = "2021"
+license = "Apache-2.0"
+description = "A firmware update protocol designed for embedded devices"
+repository = "https://github.com/drogue-iot/drogue-ajour"
+homepage = "https://drogue.io"
+keywords = ["IoT", "DFU", "Firmware", "OTA", "embedded", "no_std"]
+readme = "../README.md"
+
 edition = "2021"
 
 [dependencies]
