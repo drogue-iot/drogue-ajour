@@ -4,6 +4,3 @@ members = [
     "protocol", 
 ]
 resolver = "2"
-
-[patch.crates-io]
-drogue-client = { git = "https://github.com/drogue-iot/drogue-client.git", branch = "main" }
