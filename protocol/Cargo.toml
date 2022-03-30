@@ -7,7 +7,7 @@ license = "Apache-2.0"
 description = "A firmware update protocol designed for embedded devices"
 repository = "https://github.com/drogue-iot/drogue-ajour"
 homepage = "https://drogue.io"
-keywords = ["IoT", "DFU", "Firmware", "OTA", "embedded", "no_std"]
+keywords = ["dfu", "firmware", "ota", "embedded", "no_std"]
 readme = "../README.md"
 
 [dependencies]
