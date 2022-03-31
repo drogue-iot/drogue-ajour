@@ -1,4 +1,9 @@
-use drogue_client::{dialect, openid::AccessTokenProvider, Section, Translator};
+use drogue_client::{
+    core::v1::{ConditionStatus, Conditions},
+    dialect,
+    openid::AccessTokenProvider,
+    Section, Translator,
+};
 
 use crate::oci::Metadata;
 use drogue_ajour_protocol::Status;
@@ -39,58 +44,48 @@ pub enum FirmwareSpec {
 
 dialect!(FirmwareStatus [Section::Status => "firmware"]);
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct FirmwareStatus {
-    state: FirmwareStatusState,
+    conditions: Conditions,
     current: String,
     target: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub enum FirmwareStatusState {
-    /// Device is up to date with latest version
-    InSync,
-    /// Device update is in progress
-    InProgress {
-        /// Number between 0 and 100 indicating how far in the update process
-        progress: f32,
-    },
-    /// Device is out of date
-    OutOfDate,
-    /// Error during update
-    Error { description: String },
-}
-
 impl FirmwareStatus {
-    pub fn error(status: &Status, error: String) -> Self {
-        Self {
-            state: FirmwareStatusState::Error { description: error },
-            current: status.version.clone(),
-            target: String::new(),
-        }
-    }
+    pub fn update(&mut self, status: &Status, data: Result<&Metadata, String>) {
+        match data {
+            Ok(metadata) => {
+                self.current = status.version.clone();
+                self.target = metadata.version.clone();
+                if status.version == metadata.version {
+                    self.conditions.update("InSync", true);
+                } else {
+                    self.conditions.update("InSync", false);
 
-    pub fn new(status: &Status, metadata: &Metadata) -> Self {
-        if status.version == metadata.version {
-            Self {
-                state: FirmwareStatusState::InSync,
-                current: status.version.clone(),
-                target: metadata.version.clone(),
+                    if let Some(update) = &status.update {
+                        let progress = 100.0 * (update.offset as f32 / metadata.size as f32);
+                        self.conditions.update(
+                            "UpdateProgress",
+                            ConditionStatus {
+                                message: Some(format!("{:.2} %", progress)),
+                                ..Default::default()
+                            },
+                        );
+                    }
+                }
             }
-        } else {
-            if let Some(update) = &status.update {
-                let progress = 100.0 * (update.offset as f32 / metadata.size as f32);
-                Self {
-                    state: FirmwareStatusState::InProgress { progress },
-                    current: status.version.clone(),
-                    target: metadata.version.clone(),
-                }
-            } else {
-                Self {
-                    state: FirmwareStatusState::OutOfDate,
-                    current: status.version.clone(),
-                    target: metadata.version.clone(),
-                }
+            Err(error) => {
+                self.current = status.version.clone();
+                self.target = "Unknown".to_string();
+                self.conditions.update(
+                    "InSync",
+                    ConditionStatus {
+                        status: Some(false),
+                        message: Some("Error retrieving firmware metadata".to_string()),
+                        reason: Some(error),
+                        ..Default::default()
+                    },
+                );
             }
         }
     }
@@ -122,14 +117,21 @@ impl Index {
         Ok(None)
     }
 
-    pub async fn update_state(
+    pub async fn update_status(
         &self,
         application: &str,
         device: &str,
-        status: FirmwareStatus,
+        status: &Status,
+        data: Result<&Metadata, String>,
     ) -> Result<(), anyhow::Error> {
         if let Some(mut device) = self.client.get_device(application, device).await? {
-            device.set_section::<FirmwareStatus>(status)?;
+            let mut s: FirmwareStatus = device
+                .section::<FirmwareStatus>()
+                .unwrap_or(Ok(Default::default()))?;
+
+            //     .unwrap_or(Ok(Default::default()))?;
+            s.update(status, data);
+            device.set_section::<FirmwareStatus>(s)?;
             self.client.update_device(&device).await?;
         }
         Ok(())
