@@ -121,7 +121,7 @@ async fn main() -> anyhow::Result<()> {
         .client_id("drogue-ajour")
         .persistence(mqtt::PersistenceType::None)
         .finalize();
-    let mqtt_client = mqtt::AsyncClient::new(mqtt_opts)?;
+    let mut mqtt_client = mqtt::AsyncClient::new(mqtt_opts)?;
 
     let tp = AccessTokenProvider {
         user: args.user.to_string(),
@@ -154,6 +154,11 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let conn_opts = conn_opts.finalize();
+
+    mqtt_client.set_disconnected_callback(|c, _, _| {
+        log::info!("Disconnected, reconnecting");
+        c.reconnect();
+    });
 
     mqtt_client
         .connect(conn_opts)
