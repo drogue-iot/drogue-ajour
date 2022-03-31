@@ -1,4 +1,4 @@
-# drogue-ajour
+# Drogue Ajour (à jour => updated)
 
 The Drogue Ajour is an add-on for Drogue IoT Cloud that allows you to manage firmware updates for a fleet of devices for Drogue IoT Cloud applications. It can be used to monitor all applications accessible by a Drogue Cloud access token, or a single application.
 
