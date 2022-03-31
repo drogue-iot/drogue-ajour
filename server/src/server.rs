@@ -110,6 +110,7 @@ impl Server {
                                                 "Error publishing command back to device: {:?}",
                                                 e
                                             );
+                                            self.client.reconnect();
                                         }
                                     }
                                 }
