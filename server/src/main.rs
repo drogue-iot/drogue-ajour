@@ -156,8 +156,21 @@ async fn main() -> anyhow::Result<()> {
     let conn_opts = conn_opts.finalize();
 
     mqtt_client.set_disconnected_callback(|c, _, _| {
-        log::info!("Disconnected, reconnecting");
-        c.reconnect();
+        log::info!("Disconnected");
+        let t = c.reconnect();
+        if let Err(e) = t.wait_for(Duration::from_secs(10)) {
+            log::warn!("Error reconnecting to broker ({:?}), exiting", e);
+            std::process::exit(1);
+        }
+    });
+
+    mqtt_client.set_connection_lost_callback(|c| {
+        log::info!("Connection lost");
+        let t = c.reconnect();
+        if let Err(e) = t.wait_for(Duration::from_secs(10)) {
+            log::warn!("Error reconnecting to broker ({:?}), exiting", e);
+            std::process::exit(1);
+        }
     });
 
     mqtt_client
