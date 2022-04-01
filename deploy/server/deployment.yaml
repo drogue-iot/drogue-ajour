@@ -27,7 +27,7 @@ spec:
         imagePullPolicy: Always
         env:
           - name: RUST_LOG
-            value: debug
+            value: drogue_ajour=debug
           - name: OCI_REGISTRY_PREFIX
             valueFrom:
               secretKeyRef:
@@ -59,7 +59,7 @@ spec:
                 name: drogue-config
                 key: mqtt-integration
           - name: MQTT_GROUP_ID
-            value: "drogue-ajour"
+            value: firmware
         ports:
         - containerPort: 8080
         livenessProbe:
