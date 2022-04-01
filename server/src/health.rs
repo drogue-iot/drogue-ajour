@@ -15,7 +15,7 @@ impl HealthServer {
 
         let server = Server::bind(&addr).serve(service);
 
-        println!("Listening on http://{}", addr);
+        log::info!("Listening on http://{}", addr);
 
         server.await?;
         Ok(())

@@ -33,7 +33,7 @@ impl Server {
         for application in self.applications.iter() {
             if let Some(group_id) = &self.group_id {
                 self.client
-                    .subscribe(format!("$share/{}/app/{}", &group_id, &application), 1);
+                    .subscribe(format!("$shared/{}/app/{}", &group_id, &application), 1);
             } else {
                 self.client.subscribe(format!("app/{}", &application), 1);
             }
