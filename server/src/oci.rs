@@ -1,9 +1,10 @@
 use crate::index::ImagePullPolicy;
+use crate::metadata::Metadata;
+use crate::updater::FirmwareStore;
 use anyhow::anyhow;
 pub use client::{ClientConfig, ClientProtocol};
 use lru::LruCache;
 use oci_distribution::{client, secrets::RegistryAuth};
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::Read;
 use tokio::time::{Duration, Instant};
@@ -19,13 +20,6 @@ pub struct OciClient {
 
     // Cached by checksum
     firmware_cache: LruCache<String, Vec<u8>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Metadata {
-    pub version: String,
-    pub checksum: String,
-    pub size: u32,
 }
 
 impl OciClient {
@@ -53,7 +47,7 @@ impl OciClient {
         &mut self,
         image: &str,
         image_pull_policy: ImagePullPolicy,
-    ) -> Result<Metadata, anyhow::Error> {
+    ) -> Result<Option<Metadata>, anyhow::Error> {
         if let ImagePullPolicy::IfNotPresent = image_pull_policy {
             // Attempt cache lookup
             if let Some((inserted, entry)) = self.metadata_cache.get(image) {
@@ -62,13 +56,13 @@ impl OciClient {
                     let oldest = Instant::now() - expiry;
                     if inserted > &oldest {
                         log::debug!("Found metadata cache entry for {}", image);
-                        return Ok(entry.clone());
+                        return Ok(Some(entry.clone()));
                     } else {
                         log::debug!("Found expired entry for {}, fetching new", image);
                     }
                 } else {
                     log::debug!("Found metadata cache entry for {}", image);
-                    return Ok(entry.clone());
+                    return Ok(Some(entry.clone()));
                 }
             }
         }
@@ -83,7 +77,7 @@ impl OciClient {
                     let metadata: Metadata = serde_json::from_str(&annotation)?;
                     self.metadata_cache
                         .put(image.to_string(), (Instant::now(), metadata.clone()));
-                    Ok(metadata)
+                    Ok(Some(metadata))
                 } else {
                     Err(anyhow!("Unable to locate metadata in image config"))
                 }
@@ -143,5 +137,36 @@ impl OciClient {
             }
             Err(e) => Err(e),
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl FirmwareStore for OciClient {
+    type Params = (String, ImagePullPolicy);
+    async fn fetch_metadata(
+        &mut self,
+        params: &Self::Params,
+    ) -> Result<(Self::Context, Option<Metadata>), anyhow::Error> {
+        let m = OciClient::fetch_metadata(self, &params.0, params.1).await?;
+        Ok(((), m))
+    }
+
+    type Context = ();
+    async fn fetch_firmware(
+        &mut self,
+        params: &Self::Params,
+        _: &Self::Context,
+        metadata: &Metadata,
+    ) -> Result<Vec<u8>, anyhow::Error> {
+        OciClient::fetch_firmware(self, &params.0, metadata, params.1).await
+    }
+
+    async fn mark_finished(
+        &mut self,
+        _: &Self::Params,
+        _: &Self::Context,
+        _: bool,
+    ) -> Result<(), anyhow::Error> {
+        Ok(())
     }
 }

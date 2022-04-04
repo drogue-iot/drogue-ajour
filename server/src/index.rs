@@ -5,7 +5,7 @@ use drogue_client::{
     Section, Translator,
 };
 
-use crate::oci::Metadata;
+use crate::metadata::Metadata;
 use drogue_ajour_protocol::Status;
 use serde::{Deserialize, Serialize};
 
@@ -39,7 +39,7 @@ pub enum FirmwareSpec {
         image_pull_policy: ImagePullPolicy,
     },
     #[serde(rename = "hawkbit")]
-    HAWKBIT,
+    HAWKBIT { controller: String },
 }
 
 dialect!(FirmwareStatus [Section::Status => "firmware"]);
