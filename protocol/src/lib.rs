@@ -125,7 +125,7 @@ mod owned {
 
         pub fn new_swap(version: &str, checksum: &[u8], correlation_id: Option<u32>) -> Self {
             let mut sha256 = [0; 32];
-            let to_copy = core::cmp::min(sha256.len(), 32);
+            let to_copy = core::cmp::min(sha256.len(), checksum.len());
             sha256[..to_copy].copy_from_slice(&checksum[..to_copy]);
 
             Self::Swap {
