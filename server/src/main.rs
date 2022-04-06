@@ -115,6 +115,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let oci_client = if args.oci_registry_enable {
+        log::info!("Enabling OCI registry");
         Some(oci::OciClient::new(
             oci::ClientConfig {
                 protocol: if args.oci_registry_tls {
@@ -137,6 +138,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let hawkbit_client = if args.hawkbit_enable {
+        log::info!("Enabling Hawkbit Registry");
         Some(hawkbit::HawkbitClient::new(
             &args.hawkbit_url.unwrap(),
             &args.hawkbit_tenant.unwrap(),
