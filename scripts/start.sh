@@ -25,4 +25,21 @@ if [ "${DROGUE_APPLICATION}" != "" ]; then
     ARGS="${ARGS} --application ${DROGUE_APPLICATION}"
 fi
 
+if [ "${HAWKBIT_ENABLE}" != "" ]; then
+    ARGS="${ARGS} --hawkbit-enable"
+fi
+
+if [ "${HAWKBIT_URL}" != "" ]; then
+    ARGS="${ARGS} --hawkbit-url ${HAWKBIT_URL}"
+fi
+
+if [ "${HAWKBIT_TENANT}" != "" ]; then
+    ARGS="${ARGS} --hawkbit-tenant ${HAWKBIT_TENANT}"
+fi
+
+if [ "${HAWKBIT_GATEWAY_TOKEN}" != "" ]; then
+    ARGS="${ARGS} --hawkbit-gateway-token ${HAWKBIT_GATEWAY_TOKEN}"
+fi
+
+
 /drogue-ajour ${ARGS}
