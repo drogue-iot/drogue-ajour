@@ -6,8 +6,10 @@ use paho_mqtt as mqtt;
 
 use std::time::Duration;
 
+mod hawkbit;
 mod health;
 mod index;
+mod metadata;
 mod oci;
 mod server;
 mod updater;
@@ -16,7 +18,11 @@ mod updater;
 struct Args {
     /// Prefix to use for container registry storing images
     #[clap(long)]
-    oci_registry_prefix: String,
+    oci_registry_prefix: Option<String>,
+
+    /// Prefix to use for container registry storing images
+    #[clap(long)]
+    oci_registry_enable: bool,
 
     /// Prefix to use for container registry storing images
     #[clap(long)]
@@ -34,11 +40,24 @@ struct Args {
     #[clap(long)]
     oci_registry_insecure: bool,
 
+    // Max number of OCI firmware cache entries
     #[clap(long, default_value_t = 50)]
     oci_cache_entries_max: usize,
 
     #[clap(long)]
     oci_cache_expiry: Option<u64>,
+
+    #[clap(long)]
+    hawkbit_enable: bool,
+
+    #[clap(long)]
+    hawkbit_url: Option<String>,
+
+    #[clap(long)]
+    hawkbit_tenant: Option<String>,
+
+    #[clap(long)]
+    hawkbit_gateway_token: Option<String>,
 
     /// Mqtt server uri (tcp://host:port)
     #[clap(long)]
@@ -95,23 +114,37 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     env_logger::init();
 
-    let oci_client = oci::OciClient::new(
-        oci::ClientConfig {
-            protocol: if args.oci_registry_tls {
-                oci::ClientProtocol::Https
-            } else {
-                oci::ClientProtocol::Http
+    let oci_client = if args.oci_registry_enable {
+        Some(oci::OciClient::new(
+            oci::ClientConfig {
+                protocol: if args.oci_registry_tls {
+                    oci::ClientProtocol::Https
+                } else {
+                    oci::ClientProtocol::Http
+                },
+                accept_invalid_hostnames: args.oci_registry_insecure,
+                accept_invalid_certificates: args.oci_registry_insecure,
+                extra_root_certificates: Vec::new(),
             },
-            accept_invalid_hostnames: args.oci_registry_insecure,
-            accept_invalid_certificates: args.oci_registry_insecure,
-            extra_root_certificates: Vec::new(),
-        },
-        args.oci_registry_prefix.clone(),
-        args.oci_registry_user.clone(),
-        args.oci_registry_token.clone(),
-        args.oci_cache_entries_max,
-        args.oci_cache_expiry.map(|s| Duration::from_secs(s)),
-    );
+            args.oci_registry_prefix.unwrap().clone(),
+            args.oci_registry_user.clone(),
+            args.oci_registry_token.clone(),
+            args.oci_cache_entries_max,
+            args.oci_cache_expiry.map(|s| Duration::from_secs(s)),
+        ))
+    } else {
+        None
+    };
+
+    let hawkbit_client = if args.hawkbit_enable {
+        Some(hawkbit::HawkbitClient::new(
+            &args.hawkbit_url.unwrap(),
+            &args.hawkbit_tenant.unwrap(),
+            &args.hawkbit_gateway_token.unwrap(),
+        ))
+    } else {
+        None
+    };
 
     let mqtt_uri = args.mqtt_uri;
     let token = args.token;
@@ -211,7 +244,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let index = index::Index::new(drg);
-    let updater = updater::Updater::new(index, oci_client);
+    let updater = updater::Updater::new(index, oci_client, hawkbit_client);
 
     let mut app = server::Server::new(mqtt_client, args.mqtt_group_id, applications, updater);
 

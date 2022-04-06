@@ -51,6 +51,10 @@ impl<'a> StatusRef<'a> {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CommandRef<'a> {
+    Wait {
+        correlation_id: Option<u32>,
+        poll: Option<u32>,
+    },
     Sync {
         version: &'a str,
         correlation_id: Option<u32>,
@@ -80,6 +84,10 @@ mod owned {
 
     #[derive(Serialize, Deserialize, Debug)]
     pub enum Command {
+        Wait {
+            correlation_id: Option<u32>,
+            poll: Option<u32>,
+        },
         Sync {
             version: String,
             correlation_id: Option<u32>,
@@ -100,6 +108,13 @@ mod owned {
     }
 
     impl Command {
+        pub fn new_wait(poll: Option<u32>, correlation_id: Option<u32>) -> Self {
+            Self::Wait {
+                correlation_id,
+                poll,
+            }
+        }
+
         pub fn new_sync(version: &str, poll: Option<u32>, correlation_id: Option<u32>) -> Self {
             Self::Sync {
                 version: version.to_string(),
@@ -137,6 +152,13 @@ mod owned {
     impl<'a> From<CommandRef<'a>> for Command {
         fn from(r: CommandRef<'a>) -> Self {
             match r {
+                CommandRef::Wait {
+                    poll,
+                    correlation_id,
+                } => Command::Wait {
+                    correlation_id,
+                    poll,
+                },
                 CommandRef::Sync {
                     version,
                     poll,

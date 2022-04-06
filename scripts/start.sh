@@ -15,6 +15,7 @@ ARGS="${ARGS} --user ${DROGUE_USER}"
 ARGS="${ARGS} --device-registry ${DROGUE_DEVICE_REGISTRY}"
 ARGS="${ARGS} --oci-registry-insecure"
 ARGS="${ARGS} --oci-cache-expiry 30"
+ARGS="${ARGS} --oci-registry-enable"
 
 if [ "${MQTT_GROUP_ID}" != "" ]; then
     ARGS="${ARGS} --mqtt-group-id ${MQTT_GROUP_ID}"
