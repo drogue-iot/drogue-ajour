@@ -221,7 +221,7 @@ impl FirmwareStore for HawkbitClient {
         }
     }
 
-    async fn mark_finished(
+    async fn mark_synced(
         &mut self,
         params: &Self::Params,
         context: &Self::Context,

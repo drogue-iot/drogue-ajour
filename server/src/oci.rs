@@ -161,7 +161,7 @@ impl FirmwareStore for OciClient {
         OciClient::fetch_firmware(self, &params.0, metadata, params.1).await
     }
 
-    async fn mark_finished(
+    async fn mark_synced(
         &mut self,
         _: &Self::Params,
         _: &Self::Context,

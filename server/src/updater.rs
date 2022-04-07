@@ -102,6 +102,8 @@ impl Updater {
                 log::debug!("Got metadata: {:?}", metadata);
 
                 if status.version == metadata.version {
+                    // Don't let this fail us
+                    let _ = store.mark_synced(params, &ctx, true).await;
                     Ok(Command::new_sync(
                         &status.version,
                         None,
@@ -207,7 +209,7 @@ pub trait FirmwareStore {
         None
     }
 
-    async fn mark_finished(
+    async fn mark_synced(
         &mut self,
         params: &Self::Params,
         context: &Self::Context,
