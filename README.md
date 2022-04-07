@@ -15,13 +15,13 @@ spec:
       image: 'image-within-repo:1234'
 ```
 
+
 If defined at the `Application` it will apply to all devices unless there is a per device property, in which case that will override the application level property.
 
-As a reference architecture, Drogue Ajour uses an Open Container Initiative (OCI) registry to store container images with the device firmware. This allows reusing existing infrastructure commonly used in Kubernetes. However, the goal is
-to support alternatives like Eclipse Hawkbit for storing the firmware.
+As a reference architecture, Drogue Ajour uses an Open Container Initiative (OCI) registry to store container images with the device firmware. This allows reusing existing infrastructure commonly used in Kubernetes. However, Drogue Ajour also integrates with Eclipse Hawkbit for storing the firmware (see below).
 
 Building and deploying firmware is decoupled from the Drogue Ajour, as long as the expected manifest format can be retrieved from a firmware metadata (in case of OCI, as a label on the container image). As a reference architecture,
-a [tekton](tekton.dev) pipeline is used to build and deploy firmware to the registry, and a local file database for storing an index of image versions that are built (expect this to move to some kind of SQL database eventually). 
+a [tekton](tekton.dev) pipeline is used to show how you can build and deploy firmware to an OCI registry.
 
 The Drogue IoT Application and Device objects contain custom properties that define the desired firmware version that each device (or all) should be served.
 ```
@@ -39,6 +39,17 @@ The Drogue IoT Application and Device objects contain custom properties that def
                 | Firmware Build Pipeline | -------> | Firmware Registry |
                 |                         |          |                   |
                 +-------------------------+          +-------------------+
+```
+
+### Hawkbit integration
+
+To use the Hawkbit integration instead of OCI, the schema is extended as follows:
+
+```
+spec:
+  firmware:
+    hawkbit:
+      controller: mycontroller
 ```
 
 ## Protocol
@@ -85,6 +96,16 @@ This allows the Drogue Ajour to check if an update is necessary at all.
     "version": "0.1.1", // Version of blob
     "offset": 0, // Offset this blob should be written to
     "data": aGVsbG8= // Base64-encoded firmware block (Binary in CBOR)
+  }
+}
+```
+
+3c. If there is no new information about firmware, and server needs the client to wait before asking again, a 'wait' command is sent.
+
+```
+{
+  "write": {
+    "poll": 300, // The amount of time to wait before checking in again
   }
 }
 ```
