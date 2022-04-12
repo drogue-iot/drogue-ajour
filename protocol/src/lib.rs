@@ -79,6 +79,8 @@ pub use owned::*;
 
 #[cfg(feature = "std")]
 mod owned {
+    use std::fmt::Formatter;
+
     use super::{CommandRef, Sha256, StatusRef};
     use serde::{Deserialize, Serialize};
 
@@ -217,6 +219,17 @@ mod owned {
                     version: u.version.to_string(),
                     offset: u.offset,
                 }),
+            }
+        }
+    }
+
+    impl std::fmt::Display for Command {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+            match self {
+                Self::Sync { .. } => write!(f, "Sync"),
+                Self::Wait { .. } => write!(f, "Wait"),
+                Self::Swap { .. } => write!(f, "Swap"),
+                Self::Write { .. } => write!(f, "Write"),
             }
         }
     }
