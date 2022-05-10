@@ -157,22 +157,7 @@ impl Updater {
                 }
             }
             Ok((ctx, None)) => {
-                if let Err(e) = index
-                    .update_status(
-                        application,
-                        device,
-                        &status,
-                        Err("Metadata not found".to_string()),
-                    )
-                    .await
-                {
-                    log::warn!(
-                        "Error updating status of device {}/{}: {:?}",
-                        application,
-                        device,
-                        e
-                    );
-                }
+                // Don't update status, just ask device to wait
                 Ok(Command::new_wait(
                     store.get_backoff(&ctx),
                     status.correlation_id,
