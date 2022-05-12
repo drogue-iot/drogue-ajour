@@ -1,10 +1,8 @@
 use crate::data::SharedDataBridge;
-use crate::fetcher::DataFetcher;
 use crate::progress::*;
 use crate::types::*;
 use patternfly_yew::*;
 use yew::prelude::*;
-use yew_oauth2::prelude::*;
 
 pub struct Overview {
     apps: usize,
@@ -62,8 +60,7 @@ impl Component for Overview {
         }
     }
 
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        log::info!("We got {} apps", self.apps);
+    fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
             <>
                 <PageSection variant={PageSectionVariant::Light} limit_width=true>

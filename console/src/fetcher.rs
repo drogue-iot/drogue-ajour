@@ -1,10 +1,6 @@
 use crate::data::{SharedDataDispatcher, SharedDataOps};
 use crate::types::Data;
-use drogue_client::{
-    openid::{AccessTokenProvider, NoTokenProvider},
-    registry::v1::{Application, Device},
-};
-use yew::context::ContextHandle;
+use drogue_client::registry::v1::{Application, Device};
 use yew_agent::*;
 use yew_oauth2::prelude::*;
 
@@ -87,9 +83,9 @@ impl Agent for DataFetcher {
         }
     }
 
-    fn connected(&mut self, id: HandlerId) {}
+    fn connected(&mut self, _id: HandlerId) {}
 
-    fn handle_input(&mut self, msg: Self::Input, id: HandlerId) {
+    fn handle_input(&mut self, msg: Self::Input, _id: HandlerId) {
         let auth = msg;
         if let Some(token) = auth.access_token() {
             let link = self.link.clone();
@@ -105,5 +101,5 @@ impl Agent for DataFetcher {
         }
     }
 
-    fn disconnected(&mut self, id: HandlerId) {}
+    fn disconnected(&mut self, _id: HandlerId) {}
 }

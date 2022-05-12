@@ -8,6 +8,13 @@ pub struct HawkbitClient {
     url: String,
     tenant: String,
     token: String,
+
+    // Cache of metadata
+    metadata_cache: LruCache<String, (Instant, Metadata)>,
+    metadata_cache_expiry: Option<Duration>,
+
+    // Cached by checksum
+    firmware_cache: LruCache<String, Vec<u8>>,
 }
 
 pub enum PollResult {

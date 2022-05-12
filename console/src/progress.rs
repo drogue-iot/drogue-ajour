@@ -1,4 +1,3 @@
-use patternfly_yew::*;
 use serde::{Deserialize, Serialize};
 use yew::prelude::*;
 use yew::Properties;

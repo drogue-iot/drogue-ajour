@@ -8,7 +8,6 @@ use drogue_client::{
 use patternfly_yew::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use std::fmt::Write;
 use yew::prelude::*;
 
 pub type Data = Vec<(Application, Vec<Device>)>;
