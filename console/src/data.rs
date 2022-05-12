@@ -17,6 +17,7 @@ where
     subscribers: HashSet<HandlerId>,
 }
 
+#[allow(dead_code)]
 pub enum RequestState<T> {
     Get,
     Set(T),
@@ -163,9 +164,11 @@ where
         Self::new(callback)
     }
 
+    /*
     pub fn request_state(&mut self) {
         self.0.send(RequestState::Get);
     }
+    */
 }
 
 impl<T> Deref for SharedDataBridge<T>

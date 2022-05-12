@@ -1,16 +1,8 @@
 use crate::data::SharedDataBridge;
 use crate::types::{ApplicationModel, Data};
-use drogue_client::{
-    core::v1::{ConditionStatus, Conditions},
-    dialect,
-    openid::AccessTokenProvider,
-    registry::v1::{Application, Device},
-    Section, Translator,
-};
+use drogue_client::registry::v1::{Application, Device};
 use patternfly_yew::*;
-use serde::{Deserialize, Serialize};
 use yew::prelude::*;
-use yew_agent::{Bridge, Bridged};
 
 pub struct ApplicationOverview {
     apps: Vec<(Application, Vec<Device>)>,

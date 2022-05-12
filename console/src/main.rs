@@ -4,11 +4,9 @@ use yew::context::ContextHandle;
 use yew::prelude::*;
 use yew::virtual_dom::VNode;
 use yew_agent::{Dispatched, Dispatcher};
+use yew_oauth2::openid::*;
 use yew_oauth2::prelude::*;
 use yew_router::prelude::*;
-use yew_router::router::Render;
-
-use yew_oauth2::openid::*;
 
 use yew_oauth2::openid::Client;
 
@@ -45,7 +43,7 @@ impl Component for App {
         Self {}
     }
 
-    fn view(&self, ctx: &Context<Self>) -> Html {
+    fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
             <>
             <OAuth2
