@@ -1,0 +1,31 @@
+[package]
+name = "drogue-ajour-console"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+yew = { version = "0.19.3" }
+yew-router = { version = "0.16.1", package = "yew-router-nested" }
+yew-oauth2 = { version = "0.2.0", features = ["router", "openid"] }
+patternfly-yew = "0.2"
+wasm-bindgen = { version = "0.2", features =["serde-serialize"] }
+wasm-logger = "0.2"
+wasm-bindgen-futures = "0.4"
+chrono = { version = "0.4", features = ["wasmbind"] }
+log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+drogue-client = { git = "https://github.com/drogue-iot/drogue-client", rev = "3ae242cbc3d334becb30b4a256bfe5aca460df8f", default-features = false, features = ["wasm"] }
+reqwest = { version = "0.11", features = ["json"] }
+openidconnect = { version = "2.2", default-features = false, features = ["reqwest", "rustls-tls", "rustcrypto"] }
+yew-agent = "0.1"
+js-sys = "0.3"
+gloo = "0.4"
+
+[patch.crates-io]
+#patternfly-yew = { git = "https://github.com/ctron/patternfly-yew", rev = "ad0b2730402c004cd6e10ec6c52a2a0da2e13310" }
+#patternfly-yew = { path = "../../../patternfly-yew" }
+openidconnect = { git = "https://github.com/ctron/openidconnect-rs", rev = "6ca4a9ab9de35600c44a8b830693137d4769edf4" }
+#yew-oauth2 = { git = "https://github.com/ctron/yew-oauth2.git", rev = "0045e462ef11890365b458d85bbe0574d054b4fc"}

@@ -67,7 +67,7 @@ impl FirmwareStatus {
                         self.conditions.update(
                             "UpdateProgress",
                             ConditionStatus {
-                                message: Some(format!("{:.2} %", progress)),
+                                message: Some(format!("{:.2}", progress)),
                                 ..Default::default()
                             },
                         );
