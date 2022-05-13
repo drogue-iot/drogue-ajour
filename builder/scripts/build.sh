@@ -5,6 +5,8 @@ set -e
 PROJECT=$1
 CARGO_BUILD_ARGS=$2
 
+rustup component add llvm-tools-preview || skip=1
+
 pushd ${PROJECT}
 REVISION=$(git rev-parse --short HEAD | tr -d '\n')
 echo "Building firmware"
