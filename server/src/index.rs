@@ -58,6 +58,7 @@ impl FirmwareStatus {
                 self.current = status.version.clone();
                 self.target = metadata.version.clone();
                 if status.version == metadata.version {
+                    self.conditions.clear();
                     self.conditions.update("InSync", true);
                 } else {
                     self.conditions.update("InSync", false);
@@ -75,6 +76,7 @@ impl FirmwareStatus {
                 }
             }
             Err(error) => {
+                self.conditions.clear();
                 self.current = status.version.clone();
                 self.target = "Unknown".to_string();
                 self.conditions.update(
