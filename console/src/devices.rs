@@ -85,7 +85,7 @@ impl Component for DeviceOverview {
             .iter()
             .map(|device| {
                 let mut model: DeviceModel = device.into();
-                if model.update_type == "Unknown" {
+                if model.update_type == "Unspecified" {
                     if let Some(app_model) = &app_model {
                         model.update_type = app_model.update_type.clone();
                     }
