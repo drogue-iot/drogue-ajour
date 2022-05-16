@@ -1,7 +1,6 @@
 use crate::data::{SharedDataDispatcher, SharedDataOps};
 use crate::types::Data;
 use drogue_client::registry::v1::{Application, Device};
-use serde::{Deserialize, Serialize};
 use yew_agent::*;
 use yew_oauth2::prelude::*;
 
@@ -20,13 +19,6 @@ pub struct DataFetcher {
 
 pub enum Msg {
     Fetch,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct BackendConfig {
-    client_id: String,
-    issuer_url: String,
-    api_url: String,
 }
 
 impl Agent for DataFetcher {

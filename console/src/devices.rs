@@ -92,6 +92,7 @@ impl Component for DeviceOverview {
                 }
                 model
             })
+            .filter(|model| model.update_type != "Unspecified")
             .collect();
         let model: SharedTableModel<DeviceModel> = models.into();
 

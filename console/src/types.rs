@@ -193,16 +193,19 @@ impl From<&(Application, Vec<Device>)> for ApplicationModel {
     fn from(entry: &(Application, Vec<Device>)) -> Self {
         let app = &entry.0;
 
-        let total = entry.1.len();
+        let mut total = 0;
         let mut synced = 0;
         let mut updating = 0;
         let mut unknown = 0;
         for device in entry.1.iter() {
             let model: DeviceModel = device.into();
-            match model.state() {
-                DeviceState::Synced => synced += 1,
-                DeviceState::Updating(_) => updating += 1,
-                DeviceState::Unknown => unknown += 1,
+            if model.update_type != "Unspecified" {
+                total += 1;
+                match model.state() {
+                    DeviceState::Synced => synced += 1,
+                    DeviceState::Updating(_) => updating += 1,
+                    DeviceState::Unknown => unknown += 1,
+                }
             }
         }
 
@@ -236,32 +239,44 @@ impl TableRenderer for ApplicationModel {
             0 => html! {{&self.name}},
             1 => html! {{&self.update_type}},
             2 => {
-                let color = if self.synced == self.total {
-                    Color::Green
-                } else if self.synced == 0 {
-                    Color::Red
+                if self.total > 0 {
+                    let color = if self.synced == self.total {
+                        Color::Green
+                    } else if self.synced == 0 {
+                        Color::Red
+                    } else {
+                        Color::Orange
+                    };
+                    html! {<Label outline={outline} label={format!("{}/{}", self.synced, self.total)} color={color} />}
                 } else {
-                    Color::Orange
-                };
-                html! {<Label outline={outline} label={format!("{}/{}", self.synced, self.total)} color={color} />}
+                    html! {<></> }
+                }
             }
             3 => {
-                let color = if self.updating > 0 {
-                    Color::Orange
+                if self.total > 0 {
+                    let color = if self.updating > 0 {
+                        Color::Orange
+                    } else {
+                        Color::Green
+                    };
+                    html! {<Label outline={outline} label={format!("{}/{}", self.updating, self.total)} color={color} />}
                 } else {
-                    Color::Green
-                };
-                html! {<Label outline={outline} label={format!("{}/{}", self.updating, self.total)} color={color} />}
+                    html! {<></> }
+                }
             }
             4 => {
-                let color = if self.unknown == self.total {
-                    Color::Red
-                } else if self.unknown > 0 {
-                    Color::Orange
+                if self.total > 0 {
+                    let color = if self.unknown == self.total {
+                        Color::Red
+                    } else if self.unknown > 0 {
+                        Color::Orange
+                    } else {
+                        Color::Green
+                    };
+                    html! {<Label outline={outline} label={format!("{}/{}", self.unknown, self.total)} color={color} />}
                 } else {
-                    Color::Green
-                };
-                html! {<Label outline={outline} label={format!("{}/{}", self.unknown, self.total)} color={color} />}
+                    html! {<></> }
+                }
             }
             _ => html! {},
         }

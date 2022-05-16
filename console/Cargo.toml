@@ -23,6 +23,8 @@ openidconnect = { version = "2.2", default-features = false, features = ["reqwes
 yew-agent = "0.1"
 js-sys = "0.3"
 gloo = "0.4"
+url = "2"
+http = "0.2"
 
 [patch.crates-io]
 patternfly-yew = { git = "https://github.com/ctron/patternfly-yew", rev = "ad0b2730402c004cd6e10ec6c52a2a0da2e13310" }
