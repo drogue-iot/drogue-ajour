@@ -23,3 +23,7 @@ jobs:
         with:
           command: build
           args: --release --all-features
+      - run: npm install
+        working-directory: console
+      - run: trunk build
+        working-directory: console

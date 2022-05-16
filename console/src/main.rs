@@ -1,5 +1,11 @@
+use data::{SharedDataBridge, SharedDataDispatcher, SharedDataOps};
+use gloo::utils::window;
+use http::header;
 use log::Level;
 use patternfly_yew::*;
+use reqwest::Method;
+use serde::{Deserialize, Serialize};
+use url::Url;
 use yew::context::ContextHandle;
 use yew::prelude::*;
 use yew::virtual_dom::VNode;
@@ -24,7 +30,10 @@ use devices::DeviceOverview;
 use fetcher::DataFetcher;
 use overview::Overview;
 
-pub struct App {}
+pub struct App {
+    _bridge: SharedDataBridge<Option<BackendConfig>>,
+    config: Option<BackendConfig>,
+}
 
 #[derive(Clone, Switch, PartialEq, Debug)]
 enum AppRoute {
@@ -36,39 +45,122 @@ enum AppRoute {
     Overview,
 }
 
+#[derive(Serialize, Deserialize, Clone, Properties, PartialEq, Debug)]
+pub struct BackendConfig {
+    client_id: String,
+    issuer_url: String,
+    api_url: String,
+}
+
+#[derive(Debug)]
+pub enum BackendError {
+    Generic(String),
+    Request(reqwest::Error),
+    Response(String),
+    UnknownResponse,
+}
+
+async fn fetch_info() -> Result<BackendConfig, BackendError> {
+    let mut url = window()
+        .location()
+        .href()
+        .map_err(|err| {
+            BackendError::Generic(format!(
+                "Unable to get base URL: {0}",
+                err.as_string().unwrap_or_else(|| "<unknown>".to_string())
+            ))
+        })
+        .and_then(|url| {
+            Url::parse(&url)
+                .map_err(|err| BackendError::Generic(format!("Unable to parse base URL: {err}")))
+        })?;
+
+    url.set_path("/endpoints/backend.json");
+    url.query_pairs_mut().clear();
+
+    log::info!("Fetch backend info: {url}");
+    let client = reqwest::Client::new();
+    let r = client
+        .request(Method::GET, url)
+        .header(header::CACHE_CONTROL, "no-cache")
+        .send()
+        .await
+        .map_err(|e| BackendError::Request(e))?;
+
+    if r.status().is_success() {
+        Ok(r.json().await.map_err(|e| BackendError::Request(e))?)
+    } else if r.status().is_client_error() || r.status().is_server_error() {
+        Err(BackendError::Response(
+            r.json().await.map_err(|e| BackendError::Request(e))?,
+        ))
+    } else {
+        Err(BackendError::UnknownResponse)
+    }
+}
+
+pub enum AppMsg {
+    BackendConfig(Option<BackendConfig>),
+}
+
 impl Component for App {
-    type Message = ();
+    type Message = AppMsg;
     type Properties = ();
-    fn create(_: &Context<Self>) -> Self {
-        Self {}
+    fn create(ctx: &Context<Self>) -> Self {
+        let bridge = SharedDataBridge::from(ctx.link(), AppMsg::BackendConfig);
+        wasm_bindgen_futures::spawn_local(async move {
+            let config: BackendConfig = fetch_info().await.unwrap();
+            SharedDataDispatcher::new().set(Some(config));
+        });
+        Self {
+            _bridge: bridge,
+            config: None,
+        }
+    }
+
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            AppMsg::BackendConfig(Some(config)) => {
+                self.config.replace(config);
+                true
+            }
+            _ => false,
+        }
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
-        html! {
-            <>
-            <OAuth2
-                config={
-                    Config {
-                        client_id: "drogue".into(),
-                        issuer_url: "https://sso.sandbox.drogue.cloud/auth/realms/drogue".into(),
-                        additional: Default::default(),
+        if let Some(config) = &self.config {
+            html! {
+                <>
+                <OAuth2
+                    config={
+                        Config {
+                            client_id: config.client_id.clone().into(),
+                            issuer_url: config.issuer_url.clone().into(),
+                            additional: Default::default(),
+                        }
                     }
-                }
-                scopes={vec!["openid".to_string()]}
-                >
-                <Failure><FailureMessage/></Failure>
-                <Authenticated>
-                    <BackdropViewer/>
-                    <ToastViewer/>
-                    <AuthenticatedApp />
-                </Authenticated>
-                <NotAuthenticated>
-                    <BackdropViewer/>
-                    <ToastViewer/>
-                    <NotAuthenticatedApp />
-                </NotAuthenticated>
-            </OAuth2>
-            </>
+                    scopes={vec!["openid".to_string()]}
+                    >
+                    <Failure><FailureMessage/></Failure>
+                    <Authenticated>
+                        <BackdropViewer/>
+                        <ToastViewer/>
+                        <AuthenticatedApp />
+                    </Authenticated>
+                    <NotAuthenticated>
+                        <BackdropViewer/>
+                        <ToastViewer/>
+                        <NotAuthenticatedApp />
+                    </NotAuthenticated>
+                </OAuth2>
+                </>
+            }
+        } else {
+            html! {
+                <>
+                    <p>{"Backend configuration is missing"}</p>
+                </>
+            }
         }
     }
 }

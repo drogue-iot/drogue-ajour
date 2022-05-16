@@ -141,31 +141,62 @@ impl TableRenderer for DeviceModel {
         let outline = false;
         match column.index {
             0 => html! {<div class="middle">{&self.name}</div>},
-            1 => html! {<div class="middle">{&self.update_type}</div>},
-            2 => match self.state() {
-                DeviceState::Updating(_) => {
-                    html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Blue} icon={Icon::Pending} /></div>}
+            1 => {
+                if self.update_type != "Unspecified" {
+                    html! {<div class="middle">{&self.update_type}</div>}
+                } else {
+                    html! {{"Not Enabled"}}
                 }
-                DeviceState::Synced => {
-                    html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Green} icon={Icon::Check} /></div>}
-                }
-                DeviceState::Unknown => {
-                    html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Orange} icon={Icon::QuestionCircle} /></div>}
-                }
-            },
-            3 => match self.state() {
-                DeviceState::Updating(value) => {
-                    html! {<div class="middle"><Gauge id={format!("{}-{}", self.app.clone(), self.name.clone())} values={vec![(value, ChartColor::DarkBlue.code().to_string(), None), (100 as f32 - value, ChartColor::LightBlue.code().to_string(), None)]} class={"progress"} label={format!("{:.1}%", value)} /></div>}
-                }
-                DeviceState::Synced => {
+            }
+            2 => {
+                if self.update_type != "Unspecified" {
+                    match self.state() {
+                        DeviceState::Updating(_) => {
+                            html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Blue} icon={Icon::Pending} /></div>}
+                        }
+                        DeviceState::Synced => {
+                            html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Green} icon={Icon::Check} /></div>}
+                        }
+                        DeviceState::Unknown => {
+                            html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Orange} icon={Icon::QuestionCircle} /></div>}
+                        }
+                    }
+                } else {
                     html! {<></>}
                 }
-                DeviceState::Unknown => {
+            }
+            3 => {
+                if self.update_type != "Unspecified" {
+                    match self.state() {
+                        DeviceState::Updating(value) => {
+                            html! {<div class="middle"><Gauge id={format!("{}-{}", self.app.clone(), self.name.clone())} values={vec![(value, ChartColor::DarkBlue.code().to_string(), None), (100 as f32 - value, ChartColor::LightBlue.code().to_string(), None)]} class={"progress"} label={format!("{:.1}%", value)} /></div>}
+                        }
+                        DeviceState::Synced => {
+                            html! {<></>}
+                        }
+                        DeviceState::Unknown => {
+                            html! {<></>}
+                        }
+                    }
+                } else {
                     html! {<></>}
                 }
-            },
-            4 => html! {<div class="middle">{&self.current}</div>},
-            5 => html! {<div class="middle">{&self.target}</div>},
+            }
+            4 => {
+                if self.update_type != "Unspecified" {
+                    html! {<div class="middle">{&self.current}</div>}
+                } else {
+                    html! {<></>}
+                }
+            }
+
+            5 => {
+                if self.update_type != "Unspecified" {
+                    html! {<div class="middle">{&self.target}</div>}
+                } else {
+                    html! {<></>}
+                }
+            }
             _ => html! {},
         }
     }
@@ -193,16 +224,19 @@ impl From<&(Application, Vec<Device>)> for ApplicationModel {
     fn from(entry: &(Application, Vec<Device>)) -> Self {
         let app = &entry.0;
 
-        let total = entry.1.len();
+        let mut total = 0;
         let mut synced = 0;
         let mut updating = 0;
         let mut unknown = 0;
         for device in entry.1.iter() {
             let model: DeviceModel = device.into();
-            match model.state() {
-                DeviceState::Synced => synced += 1,
-                DeviceState::Updating(_) => updating += 1,
-                DeviceState::Unknown => unknown += 1,
+            if model.update_type != "Unspecified" {
+                total += 1;
+                match model.state() {
+                    DeviceState::Synced => synced += 1,
+                    DeviceState::Updating(_) => updating += 1,
+                    DeviceState::Unknown => unknown += 1,
+                }
             }
         }
 
@@ -234,34 +268,52 @@ impl TableRenderer for ApplicationModel {
         let outline = false;
         match column.index {
             0 => html! {{&self.name}},
-            1 => html! {{&self.update_type}},
-            2 => {
-                let color = if self.synced == self.total {
-                    Color::Green
-                } else if self.synced == 0 {
-                    Color::Red
+            1 => {
+                if self.total > 0 {
+                    html! {{&self.update_type}}
                 } else {
-                    Color::Orange
-                };
-                html! {<Label outline={outline} label={format!("{}/{}", self.synced, self.total)} color={color} />}
+                    html! {{"Not Enabled"}}
+                }
+            }
+            2 => {
+                if self.total > 0 {
+                    let color = if self.synced == self.total {
+                        Color::Green
+                    } else if self.synced == 0 {
+                        Color::Red
+                    } else {
+                        Color::Orange
+                    };
+                    html! {<Label outline={outline} label={format!("{}/{}", self.synced, self.total)} color={color} />}
+                } else {
+                    html! {<></> }
+                }
             }
             3 => {
-                let color = if self.updating > 0 {
-                    Color::Orange
+                if self.total > 0 {
+                    let color = if self.updating > 0 {
+                        Color::Orange
+                    } else {
+                        Color::Green
+                    };
+                    html! {<Label outline={outline} label={format!("{}/{}", self.updating, self.total)} color={color} />}
                 } else {
-                    Color::Green
-                };
-                html! {<Label outline={outline} label={format!("{}/{}", self.updating, self.total)} color={color} />}
+                    html! {<></> }
+                }
             }
             4 => {
-                let color = if self.unknown == self.total {
-                    Color::Red
-                } else if self.unknown > 0 {
-                    Color::Orange
+                if self.total > 0 {
+                    let color = if self.unknown == self.total {
+                        Color::Red
+                    } else if self.unknown > 0 {
+                        Color::Orange
+                    } else {
+                        Color::Green
+                    };
+                    html! {<Label outline={outline} label={format!("{}/{}", self.unknown, self.total)} color={color} />}
                 } else {
-                    Color::Green
-                };
-                html! {<Label outline={outline} label={format!("{}/{}", self.unknown, self.total)} color={color} />}
+                    html! {<></> }
+                }
             }
             _ => html! {},
         }

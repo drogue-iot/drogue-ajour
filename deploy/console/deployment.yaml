@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: console
+  labels:
+    app.kubernetes.io/name: drogue-ajour
+    app.kubernetes.io/instance: ajour
+    app.kubernetes.io/component: console
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: drogue-ajour
+      app.kubernetes.io/instance: ajour
+      app.kubernetes.io/component: console
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: drogue-ajour
+        app.kubernetes.io/instance: ajour
+        app.kubernetes.io/component: console 
+    spec:
+      serviceAccountName: builder
+      containers:
+      - name: server
+        image: ghcr.io/drogue-iot/drogue-ajour-console:latest
+        imagePullPolicy: Always
+        env:
+          - name: DROGUE_API_URL
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: api-url
+          - name: DROGUE_ISSUER_URL
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: issuer-url
+          - name: DROGUE_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: client-id
+        ports:
+        - name: endpoint
+          containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /endpoints/backend.json
+            port: 8080
+        readinessProbe:
+          httpGet:
+            path: /endpoints/backend.json
+            port: 8080

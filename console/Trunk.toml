@@ -1,0 +1,7 @@
+[serve]
+port = 8080
+
+[[hooks]]
+stage = "build"
+command = "bash"
+command_arguments = ["trunk.d/build.sh"]
