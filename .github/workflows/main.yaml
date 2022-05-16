@@ -7,98 +7,100 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: trunk
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --all-features
-      - run: npm install
-        working-directory: console
-      - run: trunk build
-        working-directory: console
+  #build:
+  #  name: Build
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - uses: actions/checkout@v2
+  #    - uses: actions-rs/toolchain@v1
+  #      with:
+  #        toolchain: stable
+  #    - uses: actions-rs/cargo@v1
+  #      with:
+  #        command: install
+  #        args: trunk
+  #    - name: Build
+  #      uses: actions-rs/cargo@v1
+  #      with:
+  #        command: build
+  #        args: --release --all-features
+  #    - run: npm install
+  #      working-directory: console
+  #    - run: trunk build
+  #      working-directory: console
 
-  publish-server:
-    env:
-      IMAGE_NAME: drogue-ajour
-    if: ${{github.head_ref == ''}} # only for non-PRs
-    needs:
-      - build
+  #publish-server:
+  #  env:
+  #    IMAGE_NAME: drogue-ajour
+  #  if: ${{github.head_ref == ''}} # only for non-PRs
+  #  needs:
+  #    - build
 
-    runs-on: ubuntu-20.04
+  #  runs-on: ubuntu-20.04
 
-    steps:
-      - uses: actions/checkout@v2
+  #  steps:
+  #    - uses: actions/checkout@v2
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+  #    - name: Set up QEMU
+  #      uses: docker/setup-qemu-action@v1
 
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
+  #    - name: Set up Docker Buildx
+  #      id: buildx
+  #      uses: docker/setup-buildx-action@v1
 
-      - name: Available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
+  #    - name: Available platforms
+  #      run: echo ${{ steps.buildx.outputs.platforms }}
 
-      - name: Prepare information
-        run: |
-          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
-          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
-          [ "$VERSION" == "main" ] && VERSION=latest
-          echo IMAGE_ID=$IMAGE_ID >> $GITHUB_ENV
-          echo VERSION=$VERSION >> $GITHUB_ENV
+  #    - name: Prepare information
+  #      run: |
+  #        IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
+  #        IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+  #        VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+  #        [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+  #        [ "$VERSION" == "main" ] && VERSION=latest
+  #        echo IMAGE_ID=$IMAGE_ID >> $GITHUB_ENV
+  #        echo VERSION=$VERSION >> $GITHUB_ENV
 
-      - name: Verify information
-        run: |
-          echo IMAGE_ID=$IMAGE_ID
-          echo VERSION=$VERSION
+  #    - name: Verify information
+  #      run: |
+  #        echo IMAGE_ID=$IMAGE_ID
+  #        echo VERSION=$VERSION
 
-      - name: Login to GitHub container repository
-        run: echo "${{ secrets.GHCR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+  #    - name: Login to GitHub container repository
+  #      run: echo "${{ secrets.GHCR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
 
-      # As we can't seem to limit the concurrent builds, and the github actions runner gets overloaded
-      # with parallel builds, we do sequential builds without pushing. The final build, actually
-      # uses the build cache and only tags and pushes the images.
+  #    # As we can't seem to limit the concurrent builds, and the github actions runner gets overloaded
+  #    # with parallel builds, we do sequential builds without pushing. The final build, actually
+  #    # uses the build cache and only tags and pushes the images.
 
-      - name: Build (linux/amd64)
-        run: |
-          docker buildx build . --platform linux/amd64 --tag $IMAGE_ID:$VERSION
-          echo "platforms=${{ env.platforms }}linux/amd64," >> $GITHUB_ENV
+  #    - name: Build (linux/amd64)
+  #      run: |
+  #        docker buildx build . --platform linux/amd64 --tag $IMAGE_ID:$VERSION
+  #        echo "platforms=${{ env.platforms }}linux/amd64," >> $GITHUB_ENV
 
-      - name: Build (linux/arm64)
-        run: |
-          docker buildx build . --platform linux/arm64 --tag $IMAGE_ID:$VERSION
-          echo "platforms=${{ env.platforms }}linux/arm64," >> $GITHUB_ENV
+  #    - name: Build (linux/arm64)
+  #      run: |
+  #        docker buildx build . --platform linux/arm64 --tag $IMAGE_ID:$VERSION
+  #        echo "platforms=${{ env.platforms }}linux/arm64," >> $GITHUB_ENV
 
-      - name: Tag and Push
-        run: |
-          PLATFORMS=$(echo "${{ env.platforms }}" | sed 's/,$//') 
-          echo "Platforms: $PLATFORMS"
-          docker buildx build . --push --platform $PLATFORMS --tag $IMAGE_ID:$VERSION
+  #    - name: Tag and Push
+  #      run: |
+  #        PLATFORMS=$(echo "${{ env.platforms }}" | sed 's/,$//') 
+  #        echo "Platforms: $PLATFORMS"
+  #        docker buildx build . --push --platform $PLATFORMS --tag $IMAGE_ID:$VERSION
 
   publish-console:
     env:
       IMAGE_NAME: drogue-ajour-console
     if: ${{github.head_ref == ''}} # only for non-PRs
-    needs:
-      - build
 
     runs-on: ubuntu-20.04
 
     steps:
+      - run: npm install
+        working-directory: console
+      - run: trunk build
+        working-directory: console
       - uses: actions/checkout@v2
 
       - name: Set up QEMU
