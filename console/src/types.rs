@@ -141,31 +141,62 @@ impl TableRenderer for DeviceModel {
         let outline = false;
         match column.index {
             0 => html! {<div class="middle">{&self.name}</div>},
-            1 => html! {<div class="middle">{&self.update_type}</div>},
-            2 => match self.state() {
-                DeviceState::Updating(_) => {
-                    html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Blue} icon={Icon::Pending} /></div>}
+            1 => {
+                if self.update_type != "Unspecified" {
+                    html! {<div class="middle">{&self.update_type}</div>}
+                } else {
+                    html! {{"Not Enabled"}}
                 }
-                DeviceState::Synced => {
-                    html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Green} icon={Icon::Check} /></div>}
-                }
-                DeviceState::Unknown => {
-                    html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Orange} icon={Icon::QuestionCircle} /></div>}
-                }
-            },
-            3 => match self.state() {
-                DeviceState::Updating(value) => {
-                    html! {<div class="middle"><Gauge id={format!("{}-{}", self.app.clone(), self.name.clone())} values={vec![(value, ChartColor::DarkBlue.code().to_string(), None), (100 as f32 - value, ChartColor::LightBlue.code().to_string(), None)]} class={"progress"} label={format!("{:.1}%", value)} /></div>}
-                }
-                DeviceState::Synced => {
+            }
+            2 => {
+                if self.update_type != "Unspecified" {
+                    match self.state() {
+                        DeviceState::Updating(_) => {
+                            html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Blue} icon={Icon::Pending} /></div>}
+                        }
+                        DeviceState::Synced => {
+                            html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Green} icon={Icon::Check} /></div>}
+                        }
+                        DeviceState::Unknown => {
+                            html! {<div class="middle"><Label outline={outline} label={format!("{}", self.state())} color={Color::Orange} icon={Icon::QuestionCircle} /></div>}
+                        }
+                    }
+                } else {
                     html! {<></>}
                 }
-                DeviceState::Unknown => {
+            }
+            3 => {
+                if self.update_type != "Unspecified" {
+                    match self.state() {
+                        DeviceState::Updating(value) => {
+                            html! {<div class="middle"><Gauge id={format!("{}-{}", self.app.clone(), self.name.clone())} values={vec![(value, ChartColor::DarkBlue.code().to_string(), None), (100 as f32 - value, ChartColor::LightBlue.code().to_string(), None)]} class={"progress"} label={format!("{:.1}%", value)} /></div>}
+                        }
+                        DeviceState::Synced => {
+                            html! {<></>}
+                        }
+                        DeviceState::Unknown => {
+                            html! {<></>}
+                        }
+                    }
+                } else {
                     html! {<></>}
                 }
-            },
-            4 => html! {<div class="middle">{&self.current}</div>},
-            5 => html! {<div class="middle">{&self.target}</div>},
+            }
+            4 => {
+                if self.update_type != "Unspecified" {
+                    html! {<div class="middle">{&self.current}</div>}
+                } else {
+                    html! {<></>}
+                }
+            }
+
+            5 => {
+                if self.update_type != "Unspecified" {
+                    html! {<div class="middle">{&self.target}</div>}
+                } else {
+                    html! {<></>}
+                }
+            }
             _ => html! {},
         }
     }
@@ -237,7 +268,13 @@ impl TableRenderer for ApplicationModel {
         let outline = false;
         match column.index {
             0 => html! {{&self.name}},
-            1 => html! {{&self.update_type}},
+            1 => {
+                if self.total > 0 {
+                    html! {{&self.update_type}}
+                } else {
+                    html! {{"Not Enabled"}}
+                }
+            }
             2 => {
                 if self.total > 0 {
                     let color = if self.synced == self.total {
