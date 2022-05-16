@@ -3,7 +3,7 @@ set -e
 set -x
 set -o pipefail
 
-: "${BACKEND_JSON_FILE:=/etc/config/login/backend.template.json}"
+: "${BACKEND_JSON_FILE:=/backend.template.json}"
 
 if [ -z $CLIENT_ID ]; then
     export CLIENT_ID="drogue"
@@ -18,7 +18,7 @@ if [ -z $API_URL ]; then
 fi
 
 echo "Using base config from file: $BACKEND_JSON_FILE"
-cat $BACKEND_JSON_FILE | envsubst > /endpoints/backend.json
+cat $BACKEND_JSON_FILE | jq --arg client_id "${CLIENT_ID}" '. + {client_id: $client_id}' | jq --arg issuer_url "${ISSUER_URL}" '. + {issuer_url: $issuer_url}' | jq --arg api_url "${API_URL}" '. + {api_url: $api_url}' > /endpoints/backend.json
 
 echo "Final backend information:"
 echo "---"
