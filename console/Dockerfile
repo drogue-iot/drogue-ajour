@@ -4,8 +4,8 @@ LABEL org.opencontainers.image.source="https://github.com/drogue-iot/drogue-ajou
 
 RUN mkdir /public
 
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY backend.template.json /backend.template.json
+COPY console/nginx.conf /etc/nginx/nginx.conf
+COPY console/backend.template.json /backend.template.json
 
 RUN mkdir /endpoints
 VOLUME /endpoints
@@ -14,6 +14,6 @@ RUN chmod a+x /nginx.sh
 
 CMD ["/nginx.sh"]
 
-COPY dist/ /public/
+COPY console/dist/ /public/
 
 EXPOSE 8080
