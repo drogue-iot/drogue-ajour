@@ -93,6 +93,8 @@ jobs:
     env:
       IMAGE_NAME: drogue-ajour-console
     if: ${{github.head_ref == ''}} # only for non-PRs
+    needs:
+      - build
 
     runs-on: ubuntu-20.04
 
