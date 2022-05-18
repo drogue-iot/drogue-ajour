@@ -98,6 +98,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: trunk
       - run: npm install
         working-directory: console
       - run: trunk build
