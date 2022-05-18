@@ -68,8 +68,8 @@ impl Component for Overview {
                 </PageSection>
                 <PageSection>
                 <Bullseye>
-                <Gauge id={"apps"} title={format!("{} Applications", self.apps)} values={vec![(100 as f32, ChartColor::DarkGreen.code().to_string(), None)]} class={"large"}/>
-                <Gauge id={"devices"} title={format!("{} Devices", self.devices)} values={vec![(self.synced as f32, ChartColor::DarkGreen.code().to_string(), Some("Synced".to_string())), (self.updating as f32, ChartColor::DarkBlue.code().to_string(), Some("Updating".to_string())), (self.unknown as f32, ChartColor::DarkYellow.code().to_string(), Some("Unknown".to_string()))]} class={"large"}/>
+                <Gauge id={"apps"} title={format!("{} Applications", self.apps)} values={vec![(100 as f32, ChartColor::DarkBlue.code().to_string(), None)]} class={"large"}/>
+                <Gauge id={"devices"} title={format!("{} Devices", self.devices)} values={vec![(self.synced as f32, ChartColor::DarkBlue.code().to_string(), Some("Synced".to_string())), (self.updating as f32, ChartColor::LightBlue.code().to_string(), Some("Updating".to_string())), (self.unknown as f32, ChartColor::DarkYellow.code().to_string(), Some("Unknown".to_string()))]} class={"large"}/>
                 </Bullseye>
                 </PageSection>
             </>

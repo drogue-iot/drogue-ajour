@@ -23,11 +23,11 @@ impl ChartColor {
         match self {
             Self::LightGreen => "#BDE2B9",
             Self::DarkGreen => "#38812F",
-            Self::LightBlue => "#8BC1F7",
-            Self::DarkBlue => "#004B95",
-            Self::LightYellow => "#F9E0A2",
-            Self::DarkYellow => " #F0AB00",
-            Self::LightRed => "#C9190B",
+            Self::LightBlue => "#BEE1F4",
+            Self::DarkBlue => "#0066CC",
+            Self::LightYellow => "#FDF7E7",
+            Self::DarkYellow => "#F9E0A2",
+            Self::LightRed => "#FAEAE8",
             Self::DarkRed => "#470000",
         }
     }

@@ -8,10 +8,9 @@ metadata:
     app.kubernetes.io/component: console
 spec:
   selector:
-    matchLabels:
-      app.kubernetes.io/name: drogue-ajour
-      app.kubernetes.io/instance: ajour
-      app.kubernetes.io/component: console
+    app.kubernetes.io/name: drogue-ajour
+    app.kubernetes.io/instance: ajour
+    app.kubernetes.io/component: console
   type: ClusterIP
   ports:
     - name: endpoint
