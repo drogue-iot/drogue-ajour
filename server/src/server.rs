@@ -102,7 +102,7 @@ impl Server {
                                             format!("command/{}/{}/dfu", application, device);
                                         let message = mqtt::Message::new(
                                             topic,
-                                            serde_cbor::to_vec(&command)?,
+                                            serde_cbor::ser::to_vec_packed(&command)?,
                                             1,
                                         );
                                         if let Err(e) = self.client.publish(message).await {

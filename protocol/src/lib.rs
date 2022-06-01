@@ -253,4 +253,59 @@ mod tests {
         let s: CommandRef = serde_cbor::from_slice(&out).unwrap();
         println!("Out: {:?}", s);
     }
+
+    #[test]
+    fn serialized_status_size() {
+        // 1 byte version, 4 byte payload, 4 byte checksum
+        let version = &[1];
+        let mtu = Some(4);
+        let cid = None;
+        let offset = 0;
+        let next_version = &[2];
+
+        let s = StatusRef::first(version, mtu, cid);
+        let first = encode(&s);
+
+        let s = StatusRef::update(version, mtu, offset, next_version, cid);
+        let update = encode(&s);
+        println!(
+            "Serialized size:\n FIRST:\t{}\nUPDATE:\t{}",
+            first.len(),
+            update.len(),
+        );
+    }
+
+    #[test]
+    fn serialized_command_size() {
+        // 1 byte version, 4 byte payload, 4 byte checksum
+        let version = &[1];
+        let payload = &[1, 2, 3, 4];
+        let checksum = &[1, 2, 3, 4];
+
+        let s = Command::new_write(version, 0, payload, None);
+        let write = encode(&s);
+
+        let s = Command::new_wait(Some(1), None);
+        let wait = encode(&s);
+
+        let s = Command::new_sync(version, Some(1), None);
+        let sync = encode(&s);
+
+        let s = Command::new_swap(version, checksum, None);
+        let swap = encode(&s);
+        println!(
+            "Serialized size:\n WRITE:\t{}\nWAIT:\t{}\nSYNC:\t{}\nSWAP:\t{}",
+            write.len(),
+            wait.len(),
+            sync.len(),
+            swap.len()
+        );
+    }
+
+    fn encode<T>(value: &T) -> Vec<u8>
+    where
+        T: serde::Serialize,
+    {
+        serde_cbor::ser::to_vec_packed(value).unwrap()
+    }
 }
