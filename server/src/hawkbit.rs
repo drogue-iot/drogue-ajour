@@ -143,7 +143,7 @@ impl HawkbitClient {
             .unwrap();
         let metadata = Metadata {
             checksum: String::new(),
-            version,
+            version: version.into(),
             size: size as u32,
         };
 

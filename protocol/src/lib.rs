@@ -8,7 +8,7 @@ pub type Sha256 = [u8; 32];
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StatusRef<'a> {
-    pub version: &'a str,
+    pub version: &'a [u8],
     pub mtu: Option<u32>,
     pub correlation_id: Option<u32>,
     pub update: Option<UpdateStatusRef<'a>>,
@@ -16,12 +16,12 @@ pub struct StatusRef<'a> {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateStatusRef<'a> {
-    pub version: &'a str,
+    pub version: &'a [u8],
     pub offset: u32,
 }
 
 impl<'a> StatusRef<'a> {
-    pub fn first(version: &'a str, mtu: Option<u32>, correlation_id: Option<u32>) -> Self {
+    pub fn first(version: &'a [u8], mtu: Option<u32>, correlation_id: Option<u32>) -> Self {
         Self {
             version,
             mtu,
@@ -31,10 +31,10 @@ impl<'a> StatusRef<'a> {
     }
 
     pub fn update(
-        version: &'a str,
+        version: &'a [u8],
         mtu: Option<u32>,
         offset: u32,
-        next_version: &'a str,
+        next_version: &'a [u8],
         correlation_id: Option<u32>,
     ) -> Self {
         Self {
@@ -56,19 +56,22 @@ pub enum CommandRef<'a> {
         poll: Option<u32>,
     },
     Sync {
-        version: &'a str,
+        #[serde(with = "serde_bytes")]
+        version: &'a [u8],
         correlation_id: Option<u32>,
         poll: Option<u32>,
     },
     Write {
-        version: &'a str,
+        #[serde(with = "serde_bytes")]
+        version: &'a [u8],
         correlation_id: Option<u32>,
         offset: u32,
         #[serde(with = "serde_bytes")]
         data: &'a [u8],
     },
     Swap {
-        version: &'a str,
+        #[serde(with = "serde_bytes")]
+        version: &'a [u8],
         correlation_id: Option<u32>,
         checksum: Sha256,
     },
@@ -91,19 +94,22 @@ mod owned {
             poll: Option<u32>,
         },
         Sync {
-            version: String,
+            #[serde(with = "serde_bytes")]
+            version: Vec<u8>,
             correlation_id: Option<u32>,
             poll: Option<u32>,
         },
         Write {
-            version: String,
+            #[serde(with = "serde_bytes")]
+            version: Vec<u8>,
             correlation_id: Option<u32>,
             offset: u32,
             #[serde(with = "serde_bytes")]
             data: Vec<u8>,
         },
         Swap {
-            version: String,
+            #[serde(with = "serde_bytes")]
+            version: Vec<u8>,
             correlation_id: Option<u32>,
             checksum: Sha256,
         },
@@ -117,34 +123,34 @@ mod owned {
             }
         }
 
-        pub fn new_sync(version: &str, poll: Option<u32>, correlation_id: Option<u32>) -> Self {
+        pub fn new_sync(version: &[u8], poll: Option<u32>, correlation_id: Option<u32>) -> Self {
             Self::Sync {
-                version: version.to_string(),
+                version: version.to_vec(),
                 correlation_id,
                 poll,
             }
         }
 
-        pub fn new_swap(version: &str, checksum: &[u8], correlation_id: Option<u32>) -> Self {
+        pub fn new_swap(version: &[u8], checksum: &[u8], correlation_id: Option<u32>) -> Self {
             let mut sha256 = [0; 32];
             let to_copy = core::cmp::min(sha256.len(), checksum.len());
             sha256[..to_copy].copy_from_slice(&checksum[..to_copy]);
 
             Self::Swap {
-                version: version.to_string(),
+                version: version.to_vec(),
                 correlation_id,
                 checksum: sha256,
             }
         }
 
         pub fn new_write(
-            version: &str,
+            version: &[u8],
             offset: u32,
             data: &[u8],
             correlation_id: Option<u32>,
         ) -> Self {
             Self::Write {
-                version: version.to_string(),
+                version: version.to_vec(),
                 correlation_id,
                 offset,
                 data: data.to_vec(),
@@ -167,7 +173,7 @@ mod owned {
                     poll,
                     correlation_id,
                 } => Command::Sync {
-                    version: version.to_string(),
+                    version: version.to_vec(),
                     correlation_id,
                     poll,
                 },
@@ -177,7 +183,7 @@ mod owned {
                     data,
                     correlation_id,
                 } => Command::Write {
-                    version: version.to_string(),
+                    version: version.to_vec(),
                     correlation_id,
                     offset,
                     data: data.to_vec(),
@@ -187,7 +193,7 @@ mod owned {
                     correlation_id,
                     checksum,
                 } => Command::Swap {
-                    version: version.to_string(),
+                    version: version.to_vec(),
                     correlation_id,
                     checksum,
                 },
@@ -197,7 +203,7 @@ mod owned {
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Status {
-        pub version: String,
+        pub version: Vec<u8>,
         pub correlation_id: Option<u32>,
         pub mtu: Option<u32>,
         pub update: Option<UpdateStatus>,
@@ -205,18 +211,18 @@ mod owned {
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct UpdateStatus {
-        pub version: String,
+        pub version: Vec<u8>,
         pub offset: u32,
     }
 
     impl<'a> From<StatusRef<'a>> for Status {
         fn from(r: StatusRef<'a>) -> Self {
             Self {
-                version: r.version.to_string(),
+                version: r.version.to_vec(),
                 correlation_id: r.correlation_id,
                 mtu: r.mtu,
                 update: r.update.map(|u| UpdateStatus {
-                    version: u.version.to_string(),
+                    version: u.version.to_vec(),
                     offset: u.offset,
                 }),
             }
@@ -241,7 +247,7 @@ mod tests {
 
     #[test]
     fn deserialize_ref() {
-        let s = Command::new_write("1234", 0, &[1, 2, 3, 4], None);
+        let s = Command::new_write(b"1234", 0, &[1, 2, 3, 4], None);
         let out = serde_cbor::to_vec(&s).unwrap();
 
         let s: CommandRef = serde_cbor::from_slice(&out).unwrap();

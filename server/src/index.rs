@@ -55,8 +55,12 @@ impl FirmwareStatus {
     pub fn update(&mut self, status: &Status, data: Result<&Metadata, String>) {
         match data {
             Ok(metadata) => {
-                self.current = status.version.clone();
-                self.target = metadata.version.clone();
+                self.current = core::str::from_utf8(&status.version)
+                    .unwrap_or("Unknown")
+                    .to_string();
+                self.current = core::str::from_utf8(&metadata.version)
+                    .unwrap_or("Unknown")
+                    .to_string();
                 if status.version == metadata.version {
                     self.conditions.clear();
                     self.conditions.update("InSync", true);
@@ -77,7 +81,9 @@ impl FirmwareStatus {
             }
             Err(error) => {
                 self.conditions.clear();
-                self.current = status.version.clone();
+                self.current = core::str::from_utf8(&status.version)
+                    .unwrap_or("Unknown")
+                    .to_string();
                 self.target = "Unknown".to_string();
                 self.conditions.update(
                     "InSync",

@@ -87,7 +87,7 @@ impl Server {
 
                                 if let Some(Ok(status)) = status {
                                     log::info!(
-                                        "Device {}/{} running version {}",
+                                        "Device {}/{} running version {:?}",
                                         application,
                                         device,
                                         status.version

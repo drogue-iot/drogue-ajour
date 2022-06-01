@@ -121,7 +121,7 @@ impl Updater {
                         }
                     } else {
                         log::info!(
-                            "Updating device {}/{} from {} to {}",
+                            "Updating device {}/{} from {:?} to {:?}",
                             application,
                             device,
                             status.version,
