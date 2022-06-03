@@ -38,6 +38,8 @@ pub enum FirmwareSpec {
     },
     #[serde(rename = "hawkbit")]
     HAWKBIT { controller: String },
+    #[serde(rename = "file")]
+    FILE { name: String },
 }
 
 dialect!(FirmwareStatus [Section::Status => "firmware"]);

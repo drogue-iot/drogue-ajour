@@ -2,6 +2,7 @@ use anyhow::anyhow;
 
 use drogue_ajour_protocol::{Command, Status};
 
+use crate::file::FileClient;
 use crate::hawkbit::HawkbitClient;
 use crate::index::{FirmwareSpec, Index};
 use crate::metadata::Metadata;
@@ -11,14 +12,21 @@ pub struct Updater {
     index: Index,
     oci: Option<OciClient>,
     hawkbit: Option<HawkbitClient>,
+    file: Option<FileClient>,
 }
 
 impl Updater {
-    pub fn new(index: Index, oci: Option<OciClient>, hawkbit: Option<HawkbitClient>) -> Self {
+    pub fn new(
+        index: Index,
+        oci: Option<OciClient>,
+        hawkbit: Option<HawkbitClient>,
+        file: Option<FileClient>,
+    ) -> Self {
         Self {
             oci,
             index,
             hawkbit,
+            file,
         }
     }
     pub async fn process<'a>(
@@ -61,6 +69,18 @@ impl Updater {
                     } else {
                         let e = format!(
                             "Device {}/{} requested Hawkbit firwmare, but no Hawkbit configured",
+                            application, device
+                        );
+                        log::warn!("{}", e);
+                        Err(anyhow!("{}", e))
+                    }
+                }
+                FirmwareSpec::FILE { name } => {
+                    if let Some(f) = self.file.as_mut() {
+                        Self::process_update(f, index, application, device, &status, &name).await
+                    } else {
+                        let e = format!(
+                            "Device {}/{} requested firwmare from file, but no file registry configured",
                             application, device
                         );
                         log::warn!("{}", e);

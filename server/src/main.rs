@@ -1,11 +1,13 @@
 use anyhow::{anyhow, Context};
 use clap::Parser;
+use std::path::PathBuf;
 
 use drogue_client::openid::AccessTokenProvider;
 use paho_mqtt as mqtt;
 
 use std::time::Duration;
 
+mod file;
 mod hawkbit;
 mod health;
 mod index;
@@ -46,6 +48,12 @@ struct Args {
 
     #[clap(long)]
     oci_cache_expiry: Option<u64>,
+
+    #[clap(long)]
+    file_registry_enable: bool,
+
+    #[clap(long)]
+    file_registry_path: Option<PathBuf>,
 
     #[clap(long)]
     hawkbit_enable: bool,
@@ -144,6 +152,13 @@ async fn main() -> anyhow::Result<()> {
             &args.hawkbit_tenant.unwrap(),
             &args.hawkbit_gateway_token.unwrap(),
         ))
+    } else {
+        None
+    };
+
+    let file_client = if args.file_registry_enable {
+        log::info!("Enabling File Registry");
+        Some(file::FileClient::new(&args.file_registry_path.unwrap()))
     } else {
         None
     };
@@ -247,7 +262,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let index = index::Index::new(drg);
-    let updater = updater::Updater::new(index, oci_client, hawkbit_client);
+    let updater = updater::Updater::new(index, oci_client, hawkbit_client, file_client);
 
     let mut app = server::Server::new(mqtt_client, args.mqtt_group_id, applications, updater);
 
