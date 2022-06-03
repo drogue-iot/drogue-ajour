@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM ghcr.io/drogue-iot/builder:0.1.19 as builder
+FROM --platform=$BUILDPLATFORM ghcr.io/drogue-iot/builder:0.1.20 as builder
 
 RUN mkdir /build
 ADD . /build
