@@ -1,6 +1,6 @@
 //! A protocol for updating firmware of embedded devices from a remote server. The protocol is not
 //! tied to any specific platform, but is designed to work with Drogue Ajour and Drogue Cloud.
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 
 use core::cmp::Ordering;
 use core::hash::{Hash, Hasher};
@@ -211,7 +211,10 @@ impl<'de> Visitor<'de> for BytesVisitor {
 
 #[cfg(test)]
 mod tests {
+    extern crate std;
     use super::*;
+    use std::println;
+    use std::vec::Vec;
 
     #[test]
     fn deserialize_ref() {
