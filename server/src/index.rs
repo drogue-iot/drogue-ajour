@@ -1,15 +1,13 @@
 use drogue_client::{
     core::v1::{ConditionStatus, Conditions},
-    dialect,
-    openid::AccessTokenProvider,
-    Section, Translator,
+    dialect, Section, Translator,
 };
 
 use crate::metadata::Metadata;
 use drogue_ajour_protocol::Status;
 use serde::{Deserialize, Serialize};
 
-pub type DrogueClient = drogue_client::registry::v1::Client<AccessTokenProvider>;
+pub type DrogueClient = drogue_client::registry::v1::Client;
 
 #[derive(Clone)]
 pub struct Index {
@@ -129,7 +127,7 @@ impl Index {
         &self,
         application: &str,
         device: &str,
-        status: &Status,
+        status: &Status<'_>,
         data: Result<&Metadata, String>,
     ) -> Result<(), anyhow::Error> {
         if let Some(mut device) = self.client.get_device(application, device).await? {

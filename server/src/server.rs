@@ -94,17 +94,14 @@ impl Server {
                                     );
                                     log::debug!("Received status from {}: {:?}", device, status);
                                     if let Ok(command) =
-                                        self.updater.process(&application, &device, status).await
+                                        self.updater.process(&application, &device, &status).await
                                     {
-                                        log::debug!("Sending command to {}: {}", device, command);
+                                        log::debug!("Sending command to {}: {:?}", device, command);
 
                                         let topic =
                                             format!("command/{}/{}/dfu", application, device);
-                                        let message = mqtt::Message::new(
-                                            topic,
-                                            serde_cbor::ser::to_vec_packed(&command)?,
-                                            1,
-                                        );
+                                        let message =
+                                            mqtt::Message::new(topic, command.as_bytes(), 1);
                                         if let Err(e) = self.client.publish(message).await {
                                             log::warn!(
                                                 "Error publishing command back to device: {:?}",

@@ -228,7 +228,8 @@ async fn main() -> anyhow::Result<()> {
     if let Some(app) = args.application {
         applications.push(app);
     } else {
-        let apps: Option<Vec<drogue_client::registry::v1::Application>> = drg.list_apps().await?;
+        let apps: Option<Vec<drogue_client::registry::v1::Application>> =
+            drg.list_apps(None).await?;
         if let Some(apps) = apps {
             for app in apps {
                 if !excluded.contains(&app.metadata.name) {

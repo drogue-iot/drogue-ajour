@@ -2,28 +2,31 @@
 //! tied to any specific platform, but is designed to work with Drogue Ajour and Drogue Cloud.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use serde::{Deserialize, Serialize};
-
-pub type Sha256 = [u8; 32];
+use core::cmp::Ordering;
+use core::hash::{Hash, Hasher};
+use core::ops::Deref;
+use serde::{de::Visitor, Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct StatusRef<'a> {
-    pub version: &'a [u8],
+pub struct Status<'a> {
+    #[serde(borrow)]
+    pub version: Bytes<'a>,
     pub mtu: Option<u32>,
     pub correlation_id: Option<u32>,
-    pub update: Option<UpdateStatusRef<'a>>,
+    pub update: Option<UpdateStatus<'a>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct UpdateStatusRef<'a> {
-    pub version: &'a [u8],
+pub struct UpdateStatus<'a> {
+    #[serde(borrow)]
+    pub version: Bytes<'a>,
     pub offset: u32,
 }
 
-impl<'a> StatusRef<'a> {
+impl<'a> Status<'a> {
     pub fn first(version: &'a [u8], mtu: Option<u32>, correlation_id: Option<u32>) -> Self {
         Self {
-            version,
+            version: Bytes::new(version),
             mtu,
             correlation_id,
             update: None,
@@ -38,206 +41,171 @@ impl<'a> StatusRef<'a> {
         correlation_id: Option<u32>,
     ) -> Self {
         Self {
-            version,
+            version: Bytes::new(version),
             mtu,
             correlation_id,
-            update: Some(UpdateStatusRef {
+            update: Some(UpdateStatus {
                 offset,
-                version: next_version,
+                version: Bytes::new(next_version),
             }),
         }
     }
 }
-
 #[derive(Serialize, Deserialize, Debug)]
-pub enum CommandRef<'a> {
+pub enum Command<'a> {
     Wait {
         correlation_id: Option<u32>,
         poll: Option<u32>,
     },
     Sync {
-        #[serde(with = "serde_bytes")]
-        version: &'a [u8],
+        #[serde(borrow)]
+        version: Bytes<'a>,
         correlation_id: Option<u32>,
         poll: Option<u32>,
     },
     Write {
-        #[serde(with = "serde_bytes")]
-        version: &'a [u8],
+        #[serde(borrow)]
+        version: Bytes<'a>,
         correlation_id: Option<u32>,
         offset: u32,
-        #[serde(with = "serde_bytes")]
-        data: &'a [u8],
+        #[serde(borrow)]
+        data: Bytes<'a>,
     },
     Swap {
-        #[serde(with = "serde_bytes")]
-        version: &'a [u8],
+        #[serde(borrow)]
+        version: Bytes<'a>,
         correlation_id: Option<u32>,
-        checksum: Sha256,
+        #[serde(borrow)]
+        checksum: Bytes<'a>,
     },
 }
 
-#[cfg(feature = "std")]
-pub use owned::*;
-
-#[cfg(feature = "std")]
-mod owned {
-    use std::fmt::Formatter;
-
-    use super::{CommandRef, Sha256, StatusRef};
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub enum Command {
-        Wait {
-            correlation_id: Option<u32>,
-            poll: Option<u32>,
-        },
-        Sync {
-            #[serde(with = "serde_bytes")]
-            version: Vec<u8>,
-            correlation_id: Option<u32>,
-            poll: Option<u32>,
-        },
-        Write {
-            #[serde(with = "serde_bytes")]
-            version: Vec<u8>,
-            correlation_id: Option<u32>,
-            offset: u32,
-            #[serde(with = "serde_bytes")]
-            data: Vec<u8>,
-        },
-        Swap {
-            #[serde(with = "serde_bytes")]
-            version: Vec<u8>,
-            correlation_id: Option<u32>,
-            checksum: Sha256,
-        },
-    }
-
-    impl Command {
-        pub fn new_wait(poll: Option<u32>, correlation_id: Option<u32>) -> Self {
-            Self::Wait {
-                correlation_id,
-                poll,
-            }
-        }
-
-        pub fn new_sync(version: &[u8], poll: Option<u32>, correlation_id: Option<u32>) -> Self {
-            Self::Sync {
-                version: version.to_vec(),
-                correlation_id,
-                poll,
-            }
-        }
-
-        pub fn new_swap(version: &[u8], checksum: &[u8], correlation_id: Option<u32>) -> Self {
-            let mut sha256 = [0; 32];
-            let to_copy = core::cmp::min(sha256.len(), checksum.len());
-            sha256[..to_copy].copy_from_slice(&checksum[..to_copy]);
-
-            Self::Swap {
-                version: version.to_vec(),
-                correlation_id,
-                checksum: sha256,
-            }
-        }
-
-        pub fn new_write(
-            version: &[u8],
-            offset: u32,
-            data: &[u8],
-            correlation_id: Option<u32>,
-        ) -> Self {
-            Self::Write {
-                version: version.to_vec(),
-                correlation_id,
-                offset,
-                data: data.to_vec(),
-            }
+impl<'a> Command<'a> {
+    pub fn new_wait(poll: Option<u32>, correlation_id: Option<u32>) -> Self {
+        Self::Wait {
+            correlation_id,
+            poll,
         }
     }
 
-    impl<'a> From<CommandRef<'a>> for Command {
-        fn from(r: CommandRef<'a>) -> Self {
-            match r {
-                CommandRef::Wait {
-                    poll,
-                    correlation_id,
-                } => Command::Wait {
-                    correlation_id,
-                    poll,
-                },
-                CommandRef::Sync {
-                    version,
-                    poll,
-                    correlation_id,
-                } => Command::Sync {
-                    version: version.to_vec(),
-                    correlation_id,
-                    poll,
-                },
-                CommandRef::Write {
-                    version,
-                    offset,
-                    data,
-                    correlation_id,
-                } => Command::Write {
-                    version: version.to_vec(),
-                    correlation_id,
-                    offset,
-                    data: data.to_vec(),
-                },
-                CommandRef::Swap {
-                    version,
-                    correlation_id,
-                    checksum,
-                } => Command::Swap {
-                    version: version.to_vec(),
-                    correlation_id,
-                    checksum,
-                },
-            }
+    pub fn new_sync(version: &'a [u8], poll: Option<u32>, correlation_id: Option<u32>) -> Self {
+        Self::Sync {
+            version: Bytes::new(version),
+            correlation_id,
+            poll,
         }
     }
 
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct Status {
-        pub version: Vec<u8>,
-        pub correlation_id: Option<u32>,
-        pub mtu: Option<u32>,
-        pub update: Option<UpdateStatus>,
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct UpdateStatus {
-        pub version: Vec<u8>,
-        pub offset: u32,
-    }
-
-    impl<'a> From<StatusRef<'a>> for Status {
-        fn from(r: StatusRef<'a>) -> Self {
-            Self {
-                version: r.version.to_vec(),
-                correlation_id: r.correlation_id,
-                mtu: r.mtu,
-                update: r.update.map(|u| UpdateStatus {
-                    version: u.version.to_vec(),
-                    offset: u.offset,
-                }),
-            }
+    pub fn new_swap(version: &'a [u8], checksum: &'a [u8], correlation_id: Option<u32>) -> Self {
+        Self::Swap {
+            version: Bytes::new(version),
+            correlation_id,
+            checksum: Bytes::new(checksum),
         }
     }
 
-    impl std::fmt::Display for Command {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-            match self {
-                Self::Sync { .. } => write!(f, "Sync"),
-                Self::Wait { .. } => write!(f, "Wait"),
-                Self::Swap { .. } => write!(f, "Swap"),
-                Self::Write { .. } => write!(f, "Write"),
-            }
+    pub fn new_write(
+        version: &'a [u8],
+        offset: u32,
+        data: &'a [u8],
+        correlation_id: Option<u32>,
+    ) -> Self {
+        Self::Write {
+            version: Bytes::new(version),
+            correlation_id,
+            offset,
+            data: Bytes::new(data),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct Bytes<'a> {
+    data: &'a [u8],
+}
+
+impl<'a> Bytes<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
+        Self { data }
+    }
+}
+
+impl<'a> Serialize for Bytes<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.data)
+    }
+}
+
+impl<'a, 'de: 'a> Deserialize<'de> for Bytes<'a> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_bytes(BytesVisitor)
+    }
+}
+
+impl<'a> AsRef<[u8]> for Bytes<'a> {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl<'a> Deref for Bytes<'a> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<'a> Default for Bytes<'a> {
+    fn default() -> Self {
+        Bytes::new(&[])
+    }
+}
+
+impl<'a, Rhs> PartialEq<Rhs> for Bytes<'a>
+where
+    Rhs: ?Sized + AsRef<[u8]>,
+{
+    fn eq(&self, other: &Rhs) -> bool {
+        self.as_ref().eq(other.as_ref())
+    }
+}
+
+impl<'a, Rhs> PartialOrd<Rhs> for Bytes<'a>
+where
+    Rhs: ?Sized + AsRef<[u8]>,
+{
+    fn partial_cmp(&self, other: &Rhs) -> Option<Ordering> {
+        self.as_ref().partial_cmp(other.as_ref())
+    }
+}
+
+impl<'a> Hash for Bytes<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.data.hash(state);
+    }
+}
+
+struct BytesVisitor;
+
+impl<'de> Visitor<'de> for BytesVisitor {
+    type Value = Bytes<'de>;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+        formatter.write_str("a byte slice")
+    }
+
+    fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Bytes::new(v))
     }
 }
 
@@ -250,7 +218,7 @@ mod tests {
         let s = Command::new_write(b"1234", 0, &[1, 2, 3, 4], None);
         let out = serde_cbor::to_vec(&s).unwrap();
 
-        let s: CommandRef = serde_cbor::from_slice(&out).unwrap();
+        let s: Command = serde_cbor::from_slice(&out).unwrap();
         println!("Out: {:?}", s);
     }
 
@@ -263,10 +231,10 @@ mod tests {
         let offset = 0;
         let next_version = &[2];
 
-        let s = StatusRef::first(version, mtu, cid);
+        let s = Status::first(version, mtu, cid);
         let first = encode(&s);
 
-        let s = StatusRef::update(version, mtu, offset, next_version, cid);
+        let s = Status::update(version, mtu, offset, next_version, cid);
         let update = encode(&s);
         println!(
             "Serialized size:\n FIRST:\t{}\nUPDATE:\t{}",

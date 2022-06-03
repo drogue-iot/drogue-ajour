@@ -21,12 +21,12 @@ impl Updater {
             hawkbit,
         }
     }
-    pub async fn process(
+    pub async fn process<'a>(
         &mut self,
         application: &str,
         device: &str,
-        status: Status,
-    ) -> Result<Command, anyhow::Error> {
+        status: &'a Status<'a>,
+    ) -> Result<SerializedCommand, anyhow::Error> {
         if let Some(spec) = self.index.latest_version(application, device).await? {
             let index = &mut self.index;
             match spec {
@@ -40,7 +40,7 @@ impl Updater {
                             index,
                             application,
                             device,
-                            status,
+                            &status,
                             &(image.to_string(), image_pull_policy),
                         )
                         .await
@@ -56,7 +56,7 @@ impl Updater {
                 FirmwareSpec::HAWKBIT { controller } => {
                     if let Some(hb) = self.hawkbit.as_mut() {
                         hb.register(&controller).await?;
-                        Self::process_update(hb, index, application, device, status, &controller)
+                        Self::process_update(hb, index, application, device, &status, &controller)
                             .await
                     } else {
                         let e = format!(
@@ -73,14 +73,14 @@ impl Updater {
         }
     }
 
-    async fn process_update<F>(
+    async fn process_update<'a, F>(
         store: &mut F,
         index: &mut Index,
         application: &str,
         device: &str,
-        status: Status,
+        status: &'a Status<'a>,
         params: &F::Params,
-    ) -> Result<Command, anyhow::Error>
+    ) -> Result<SerializedCommand, anyhow::Error>
     where
         F: FirmwareStore,
     {
@@ -104,18 +104,17 @@ impl Updater {
                 if status.version == metadata.version {
                     // Don't let this fail us
                     let _ = store.mark_synced(params, &ctx, true).await;
-                    Ok(Command::new_sync(
-                        &status.version,
-                        None,
-                        status.correlation_id,
-                    ))
+                    Ok(
+                        Command::new_sync(&status.version.as_ref(), None, status.correlation_id)
+                            .try_into()?,
+                    )
                 } else {
                     let mut offset = 0;
                     let mut mtu = 512;
                     if let Some(m) = status.mtu {
                         mtu = m as usize;
                     }
-                    if let Some(update) = status.update {
+                    if let Some(update) = &status.update {
                         if update.version == metadata.version {
                             offset = update.offset as usize;
                         }
@@ -145,23 +144,20 @@ impl Updater {
                             offset as u32,
                             block,
                             status.correlation_id,
-                        ))
+                        )
+                        .try_into()?)
                     } else {
                         let data = hex::decode(&metadata.checksum)?;
-                        Ok(Command::new_swap(
-                            &metadata.version,
-                            &data,
-                            status.correlation_id,
-                        ))
+                        Ok(
+                            Command::new_swap(&metadata.version, &data, status.correlation_id)
+                                .try_into()?,
+                        )
                     }
                 }
             }
             Ok((ctx, None)) => {
                 // Don't update status, just ask device to wait
-                Ok(Command::new_wait(
-                    store.get_backoff(&ctx),
-                    status.correlation_id,
-                ))
+                Ok(Command::new_wait(store.get_backoff(&ctx), status.correlation_id).try_into()?)
             }
             Err(e) => {
                 if let Err(e) = index
@@ -178,6 +174,25 @@ impl Updater {
                 Err(e.into())
             }
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct SerializedCommand {
+    data: Vec<u8>,
+}
+
+impl SerializedCommand {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.data[..]
+    }
+}
+
+impl<'a> TryFrom<Command<'a>> for SerializedCommand {
+    type Error = serde_cbor::Error;
+    fn try_from(command: Command<'a>) -> Result<Self, Self::Error> {
+        let data = serde_cbor::ser::to_vec_packed(&command)?;
+        Ok(Self { data })
     }
 }
 
