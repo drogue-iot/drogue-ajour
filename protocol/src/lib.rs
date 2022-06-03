@@ -8,6 +8,7 @@ use core::ops::Deref;
 use serde::{de::Visitor, Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Status<'a> {
     #[serde(borrow)]
     pub version: Bytes<'a>,
@@ -17,6 +18,7 @@ pub struct Status<'a> {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct UpdateStatus<'a> {
     #[serde(borrow)]
     pub version: Bytes<'a>,
@@ -52,6 +54,7 @@ impl<'a> Status<'a> {
     }
 }
 #[derive(Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Command<'a> {
     Wait {
         correlation_id: Option<u32>,
@@ -120,6 +123,7 @@ impl<'a> Command<'a> {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Bytes<'a> {
     data: &'a [u8],
 }
