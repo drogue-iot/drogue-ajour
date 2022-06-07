@@ -58,7 +58,7 @@ impl FirmwareStatus {
                 self.current = core::str::from_utf8(&status.version)
                     .unwrap_or("Unknown")
                     .to_string();
-                self.current = core::str::from_utf8(&metadata.version)
+                self.target = core::str::from_utf8(&metadata.version)
                     .unwrap_or("Unknown")
                     .to_string();
                 if status.version == metadata.version {
@@ -140,6 +140,7 @@ impl Index {
             //     .unwrap_or(Ok(Default::default()))?;
             s.update(status, data);
             device.set_section::<FirmwareStatus>(s)?;
+            log::trace!("Updating device to to {:?}", &device);
             self.client.update_device(&device).await?;
         }
         Ok(())

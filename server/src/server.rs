@@ -96,7 +96,7 @@ impl Server {
                                     if let Ok(command) =
                                         self.updater.process(&application, &device, &status).await
                                     {
-                                        log::debug!("Sending command to {}: {:?}", device, command);
+                                        log::trace!("Sending command to {}: {:?}", device, command);
 
                                         let topic =
                                             format!("command/{}/{}/dfu", application, device);

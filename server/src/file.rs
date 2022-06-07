@@ -1,8 +1,26 @@
 use crate::metadata::Metadata;
 use crate::updater::FirmwareStore;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FileMetadata {
+    pub version: String,
+    pub checksum: String,
+    pub size: u32,
+}
+
+impl Into<Metadata> for FileMetadata {
+    fn into(self) -> Metadata {
+        Metadata {
+            version: self.version.as_bytes().to_vec(),
+            checksum: self.checksum,
+            size: self.size,
+        }
+    }
+}
 
 pub struct FileClient {
     path: PathBuf,
@@ -22,9 +40,10 @@ impl FirmwareStore for FileClient {
         &mut self,
         params: &Self::Params,
     ) -> Result<(Self::Context, Option<Metadata>), anyhow::Error> {
-        let f = self.path.join(params).join(".json");
-        let f: Metadata = serde_json::from_reader(File::open(f)?)?;
-        Ok(((), Some(f)))
+        let f = self.path.join(format!("{}.json", params));
+        log::debug!("Looking for metadata from {:?}", f);
+        let f: FileMetadata = serde_json::from_reader(File::open(f)?)?;
+        Ok(((), Some(f.try_into()?)))
     }
 
     async fn mark_synced(
@@ -43,7 +62,8 @@ impl FirmwareStore for FileClient {
         _: &Self::Context,
         _: &Metadata,
     ) -> Result<Vec<u8>, anyhow::Error> {
-        let f = self.path.join(params).join(".bin");
+        let f = self.path.join(format!("{}.bin", params));
+        log::debug!("Reading firmware from from {:?}", f);
         let mut f = File::open(f)?;
         let mut data = Vec::new();
         f.read_to_end(&mut data)?;
