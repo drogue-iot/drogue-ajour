@@ -4,7 +4,7 @@ use drogue_client::{
 };
 
 use crate::metadata::Metadata;
-use drogue_ajour_protocol::Status;
+use embedded_update::Status;
 use serde::{Deserialize, Serialize};
 
 pub type DrogueClient = drogue_client::registry::v1::Client;

@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 
-use drogue_ajour_protocol::{Command, Status};
+use embedded_update::{Command, Status};
 
 use crate::file::FileClient;
 use crate::hawkbit::HawkbitClient;

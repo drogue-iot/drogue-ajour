@@ -1,5 +1,5 @@
 use cloudevents::{event::AttributeValue, Data, Event};
-use drogue_ajour_protocol::Status;
+use embedded_update::Status;
 
 use futures::stream::StreamExt;
 use paho_mqtt as mqtt;
@@ -96,7 +96,7 @@ impl Server {
                                     if let Ok(command) =
                                         self.updater.process(&application, &device, &status).await
                                     {
-                                        log::trace!("Sending command to {}: {:?}", device, command);
+                                        //log::trace!("Sending command to {}: {:?}", device, command);
 
                                         let topic =
                                             format!("command/{}/{}/dfu", application, device);
