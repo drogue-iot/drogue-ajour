@@ -140,7 +140,6 @@ impl Index {
             //     .unwrap_or(Ok(Default::default()))?;
             s.update(status, data);
             device.set_section::<FirmwareStatus>(s)?;
-            log::trace!("Updating device to to {:?}", &device);
             self.client.update_device(&device).await?;
         }
         Ok(())
