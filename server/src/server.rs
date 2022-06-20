@@ -46,10 +46,14 @@ impl Server {
                             let mut is_dfu = false;
                             let mut application = String::new();
                             let mut device = String::new();
+                            let mut sender = String::new();
                             for a in e.iter() {
                                 log::trace!("Attribute {:?}", a);
                                 if a.0 == "subject" {
                                     if let AttributeValue::String("dfu") = a.1 {
+                                        is_dfu = true;
+                                    }
+                                    if let AttributeValue::String("223") = a.1 {
                                         is_dfu = true;
                                     }
                                 } else if a.0 == "device" {
@@ -60,8 +64,14 @@ impl Server {
                                     if let AttributeValue::String(d) = a.1 {
                                         application = d.to_string();
                                     }
+                                } else if a.0 == "sender" {
+                                    if let AttributeValue::String(d) = a.1 {
+                                        sender = d.to_string();
+                                    }
                                 }
                             }
+
+                            is_dfu = is_dfu && sender != "ttn-gateway";
 
                             log::trace!(
                                 "Event from app {}, device {}, is dfu: {}",
