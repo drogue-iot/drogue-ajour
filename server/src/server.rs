@@ -96,6 +96,7 @@ impl Server {
                                         Data::Json(v) => {
                                             // Extract lorawan payload
                                             if sender == "ttn-gateway" {
+                                                // TODO: Refactor/make it functional
                                                 if let Some(uplink) = v.get("uplink_message") {
                                                     if let Some(frm) = uplink.get("frm_payload") {
                                                         if let Some(s) = frm.as_str() {
