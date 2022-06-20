@@ -69,7 +69,12 @@ impl Server {
                             }
 
                             let is_dfu = if sender == "ttn-gateway" {
-                                subject == "223"
+                                if subject == "223" {
+                                    subject = format!("port:{}", subject);
+                                    true
+                                } else {
+                                    false
+                                }
                             } else {
                                 subject == "dfu"
                             };
@@ -147,8 +152,10 @@ impl Server {
                                     {
                                         //log::trace!("Sending command to {}: {:?}", device, command);
 
-                                        let topic =
-                                            format!("command/{}/{}/dfu", application, device);
+                                        let topic = format!(
+                                            "command/{}/{}/{}",
+                                            application, device, subject
+                                        );
                                         let message =
                                             mqtt::Message::new(topic, command.as_bytes(), 1);
                                         if let Err(e) = self.client.publish(message).await {
