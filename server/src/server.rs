@@ -82,17 +82,54 @@ impl Server {
                             );
 
                             if is_dfu {
-                                let status: Option<Result<Status, anyhow::Error>> =
-                                    e.data().map(|d| match d {
-                                        Data::Binary(b) => {
-                                            serde_cbor::from_slice(&b[..]).map_err(|e| e.into())
-                                        }
+                                let mut temporary = Vec::new();
+                                let status: Option<Result<Status, anyhow::Error>> = if let Some(d) =
+                                    e.data()
+                                {
+                                    match d {
+                                        Data::Binary(b) => Some(
+                                            serde_cbor::from_slice(&b[..]).map_err(|e| e.into()),
+                                        ),
                                         Data::String(s) => {
-                                            serde_json::from_str(&s).map_err(|e| e.into())
+                                            Some(serde_json::from_str(&s).map_err(|e| e.into()))
                                         }
-                                        Data::Json(v) => serde_json::from_str(v.as_str().unwrap())
-                                            .map_err(|e| e.into()),
-                                    });
+                                        Data::Json(v) => {
+                                            // Extract lorawan payload
+                                            if sender == "ttn-gateway" {
+                                                if let Some(uplink) = v.get("uplink_message") {
+                                                    if let Some(frm) = uplink.get("frm_payload") {
+                                                        if let Some(s) = frm.as_str() {
+                                                            if let Ok(b) = base64::decode(s) {
+                                                                temporary.extend_from_slice(&b[..]);
+                                                                let s: Option<Status> =
+                                                                    serde_cbor::from_slice(
+                                                                        &temporary[..],
+                                                                    )
+                                                                    .unwrap_or(None);
+                                                                s.map(|s| Ok(s))
+                                                            } else {
+                                                                None
+                                                            }
+                                                        } else {
+                                                            None
+                                                        }
+                                                    } else {
+                                                        None
+                                                    }
+                                                } else {
+                                                    None
+                                                }
+                                            } else {
+                                                Some(
+                                                    serde_json::from_str(v.as_str().unwrap())
+                                                        .map_err(|e| e.into()),
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    None
+                                };
 
                                 log::trace!("Status decode: {:?}", status);
 
