@@ -43,18 +43,15 @@ impl Server {
                 if let Some(m) = m {
                     match serde_json::from_slice::<Event>(m.payload()) {
                         Ok(e) => {
-                            let mut is_dfu = false;
                             let mut application = String::new();
                             let mut device = String::new();
                             let mut sender = String::new();
+                            let mut subject = String::new();
                             for a in e.iter() {
                                 log::trace!("Attribute {:?}", a);
                                 if a.0 == "subject" {
-                                    if let AttributeValue::String("dfu") = a.1 {
-                                        is_dfu = true;
-                                    }
-                                    if let AttributeValue::String("223") = a.1 {
-                                        is_dfu = true;
+                                    if let AttributeValue::String(s) = a.1 {
+                                        subject = s.to_string();
                                     }
                                 } else if a.0 == "device" {
                                     if let AttributeValue::String(d) = a.1 {
@@ -71,7 +68,11 @@ impl Server {
                                 }
                             }
 
-                            is_dfu = is_dfu && sender != "ttn-gateway";
+                            let is_dfu = if sender == "ttn-gateway" {
+                                subject == "223"
+                            } else {
+                                subject == "dfu"
+                            };
 
                             log::trace!(
                                 "Event from app {}, device {}, is dfu: {}",
