@@ -31,35 +31,52 @@ spec:
           - name: OCI_REGISTRY_PREFIX
             valueFrom:
               secretKeyRef:
-                name: container-registry
                 key: prefix
+                name: container-registry
           - name: OCI_REGISTRY_TOKEN
             valueFrom:
               secretKeyRef:
-                name: container-registry
                 key: token
+                name: container-registry
           - name: DROGUE_TOKEN
             valueFrom:
               secretKeyRef:
-                name: drogue-config
                 key: token
+                name: drogue-config
           - name: DROGUE_USER
             valueFrom:
               secretKeyRef:
-                name: drogue-config
                 key: user
+                name: drogue-config
           - name: DROGUE_DEVICE_REGISTRY
             valueFrom:
               secretKeyRef:
-                name: drogue-config
                 key: registry-url
+                name: drogue-config
           - name: DROGUE_MQTT_INTEGRATION
             valueFrom:
               secretKeyRef:
-                name: drogue-config
                 key: mqtt-integration
+                name: drogue-config
           - name: MQTT_GROUP_ID
             value: firmware
+          - name: HAWKBIT_ENABLE
+            value: "true"
+          - name: HAWKBIT_URL
+            valueFrom:
+              secretKeyRef:
+                key: url
+                name: hawkbit-config
+          - name: HAWKBIT_GATEWAY_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: gateway-token
+                name: hawkbit-config
+          - name: HAWKBIT_TENANT
+            valueFrom:
+              secretKeyRef:
+                key: tenant
+                name: hawkbit-config
         ports:
         - containerPort: 8080
         livenessProbe:
