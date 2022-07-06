@@ -4,6 +4,28 @@ The Drogue Ajour is an add-on for Drogue IoT Cloud that allows you to manage fir
 
 You can run Drogue Ajour locally or on Kubernetes (recommended for production).
 
+# Installation
+
+Download one of the install bundles, extract and apply the resource manifests for each component:
+
+```
+kubectl apply -f deploy/server
+kubectl apply -f deploy/console
+kubectl apply -f deploy/pipeline
+```
+
+In addition, you will need to create secrets for accessing additional services (you may omit those you don't need, but you might need to adjust the environment variables in the deployments as well):
+
+```
+kubectl create secret drogue-config --from-literal=client-id=<OIDC client id> --from-literal=issuer-url=<OIDC issuer URL> --from-literal=mqtt-integration=<mqtt integration endpoint hostname> --from-literal=registry-url=<drogue device registry url> --from-literal=user=<drogue access token user> --from-literal=token=<drogue access token>
+
+# If using container registry for storing firmware
+kubectl create secret generic container-registry --from-literal=prefix=localhost:5000/ --from-literal=token=<registry access token>
+
+# If using Eclipse Hawkbit
+kubectl create secret hawkbit-config --from-literal=gateway-token=<gateway token> --from-literal=tenant=<hawkbit tenant>
+```
+
 ## Architecture
 
 Drogue Ajour uses the Drogue IoT Cloud event stream and command API to communicate with devices that have firmware update capability. The Drogue IoT device registry is used to store the 'desired' firmware and version for a given device. The `Application` and `Device` objects need to use an extended schema as follows:
