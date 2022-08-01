@@ -1,6 +1,6 @@
-use crate::index::ImagePullPolicy;
 use crate::metadata::Metadata;
 use crate::updater::FirmwareStore;
+use ajour_schema::*;
 use anyhow::anyhow;
 pub use client::{ClientConfig, ClientProtocol};
 use lru::LruCache;

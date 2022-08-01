@@ -29,3 +29,4 @@ reqwest = {version = "0.11", default-features = false, features = ["json", "stre
 async-trait = "0.1"
 chrono = "0.4"
 lru = "0.7.3"
+ajour-schema = { path = "../schema" }

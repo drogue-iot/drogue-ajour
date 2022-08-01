@@ -1,10 +1,11 @@
 use anyhow::anyhow;
 
+use ajour_schema::*;
 use embedded_update::{Command, Status};
 
 use crate::file::FileClient;
 use crate::hawkbit::HawkbitClient;
-use crate::index::{FirmwareSpec, Index};
+use crate::index::Index;
 use crate::metadata::Metadata;
 use crate::oci::OciClient;
 
@@ -41,6 +42,7 @@ impl Updater {
                 FirmwareSpec::OCI {
                     image,
                     image_pull_policy,
+                    build: _,
                 } => {
                     if let Some(oci) = self.oci.as_mut() {
                         Self::process_update(

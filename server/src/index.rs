@@ -1,11 +1,8 @@
-use drogue_client::{
-    core::v1::{ConditionStatus, Conditions},
-    dialect, Section, Translator,
-};
+use ajour_schema::*;
+use drogue_client::{core::v1::ConditionStatus, Translator};
 
 use crate::metadata::Metadata;
 use embedded_update::Status;
-use serde::{Deserialize, Serialize};
 
 pub type DrogueClient = drogue_client::registry::v1::Client;
 
@@ -14,87 +11,48 @@ pub struct Index {
     client: DrogueClient,
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-pub enum ImagePullPolicy {
-    Always,
-    IfNotPresent,
-}
+fn update_status(fwstatus: &mut FirmwareStatus, status: &Status, data: Result<&Metadata, String>) {
+    match data {
+        Ok(metadata) => {
+            fwstatus.current = core::str::from_utf8(&status.version)
+                .unwrap_or("Unknown")
+                .to_string();
+            fwstatus.target = core::str::from_utf8(&metadata.version)
+                .unwrap_or("Unknown")
+                .to_string();
+            if status.version == metadata.version {
+                fwstatus.conditions.clear();
+                fwstatus.conditions.update("InSync", true);
+            } else {
+                fwstatus.conditions.update("InSync", false);
 
-impl Default for ImagePullPolicy {
-    fn default() -> Self {
-        Self::IfNotPresent
-    }
-}
-
-dialect!(FirmwareSpec [Section::Spec => "firmware"]);
-
-#[derive(Serialize, Deserialize, Debug)]
-pub enum FirmwareSpec {
-    #[serde(rename = "oci")]
-    OCI {
-        image: String,
-        #[serde(rename = "imagePullPolicy", default = "Default::default")]
-        image_pull_policy: ImagePullPolicy,
-    },
-    #[serde(rename = "hawkbit")]
-    HAWKBIT { controller: String },
-    #[serde(rename = "file")]
-    FILE { name: String },
-}
-
-dialect!(FirmwareStatus [Section::Status => "firmware"]);
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct FirmwareStatus {
-    conditions: Conditions,
-    current: String,
-    target: String,
-}
-
-impl FirmwareStatus {
-    pub fn update(&mut self, status: &Status, data: Result<&Metadata, String>) {
-        match data {
-            Ok(metadata) => {
-                self.current = core::str::from_utf8(&status.version)
-                    .unwrap_or("Unknown")
-                    .to_string();
-                self.target = core::str::from_utf8(&metadata.version)
-                    .unwrap_or("Unknown")
-                    .to_string();
-                if status.version == metadata.version {
-                    self.conditions.clear();
-                    self.conditions.update("InSync", true);
-                } else {
-                    self.conditions.update("InSync", false);
-
-                    if let Some(update) = &status.update {
-                        let progress = 100.0 * (update.offset as f32 / metadata.size as f32);
-                        self.conditions.update(
-                            "UpdateProgress",
-                            ConditionStatus {
-                                message: Some(format!("{:.2}", progress)),
-                                ..Default::default()
-                            },
-                        );
-                    }
+                if let Some(update) = &status.update {
+                    let progress = 100.0 * (update.offset as f32 / metadata.size as f32);
+                    fwstatus.conditions.update(
+                        "UpdateProgress",
+                        ConditionStatus {
+                            message: Some(format!("{:.2}", progress)),
+                            ..Default::default()
+                        },
+                    );
                 }
             }
-            Err(error) => {
-                self.conditions.clear();
-                self.current = core::str::from_utf8(&status.version)
-                    .unwrap_or("Unknown")
-                    .to_string();
-                self.target = "Unknown".to_string();
-                self.conditions.update(
-                    "InSync",
-                    ConditionStatus {
-                        status: Some(false),
-                        message: Some("Error retrieving firmware metadata".to_string()),
-                        reason: Some(error),
-                        ..Default::default()
-                    },
-                );
-            }
+        }
+        Err(error) => {
+            fwstatus.conditions.clear();
+            fwstatus.current = core::str::from_utf8(&status.version)
+                .unwrap_or("Unknown")
+                .to_string();
+            fwstatus.target = "Unknown".to_string();
+            fwstatus.conditions.update(
+                "InSync",
+                ConditionStatus {
+                    status: Some(false),
+                    message: Some("Error retrieving firmware metadata".to_string()),
+                    reason: Some(error),
+                    ..Default::default()
+                },
+            );
         }
     }
 }
@@ -138,7 +96,7 @@ impl Index {
                 .unwrap_or(Ok(Default::default()))?;
 
             //     .unwrap_or(Ok(Default::default()))?;
-            s.update(status, data);
+            update_status(&mut s, status, data);
             device.set_section::<FirmwareStatus>(s)?;
             self.client.update_device(&device).await?;
         }
