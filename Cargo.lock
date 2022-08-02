@@ -842,6 +842,7 @@ dependencies = [
  "kube",
  "log",
  "reqwest",
+ "serde",
  "serde_json",
 ]
 

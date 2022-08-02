@@ -22,6 +22,7 @@ pub enum FirmwareSpec {
         image: String,
         #[serde(rename = "imagePullPolicy", default = "Default::default")]
         image_pull_policy: ImagePullPolicy,
+        #[serde(skip_serializing_if = "Option::is_none")]
         build: Option<FirmwareBuildSpec>,
     },
     #[serde(rename = "hawkbit")]
@@ -32,12 +33,20 @@ pub enum FirmwareSpec {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FirmwareBuildSpec {
-    pub image: String,
+    /// Build source
     pub source: FirmwareBuildSource,
-    pub env: Vec<FirmwareBuildEnv>,
-    pub args: Vec<String>,
-    pub artifact: FirmwareBuildArtifact,
-    pub timeout: String,
+    /// Builder image
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    /// Pipeline environment variables
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub env: Option<Vec<FirmwareBuildEnv>>,
+    /// Build command line arguments
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<Vec<String>>,
+    /// Build timeout
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
