@@ -1,6 +1,8 @@
 [workspace]
 members = [
+    "api",
     "server",
+    "schema",
 ]
 resolver = "2"
 

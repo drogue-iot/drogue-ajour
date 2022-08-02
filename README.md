@@ -1,5 +1,9 @@
 # Drogue Ajour (à jour => updated)
 
+[![CI](https://github.com/drogue-iot/drogue-ajour/workflows/CI/badge.svg)](https://github.com/drogue-iot/drogue-ajour/actions?query=workflow%3A%22CI%22)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/tag/drogue-iot/drogue-ajour?sort=semver)](https://github.com/drogue-iot/drogue-ajour/releases)
+[![Matrix](https://img.shields.io/matrix/drogue-iot:matrix.org)](https://matrix.to/#/#drogue-iot:matrix.org)
+
 The Drogue Ajour is an add-on for Drogue IoT Cloud that allows you to manage firmware updates for a fleet of devices for Drogue IoT Cloud applications. It can be used to monitor all applications accessible by a Drogue Cloud access token, or a single application.
 
 You can run Drogue Ajour locally or on Kubernetes (recommended for production).

@@ -1,0 +1,16 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: api
+  labels:
+    app.kubernetes.io/name: drogue-ajour
+    app.kubernetes.io/instance: ajour
+    app.kubernetes.io/component: api
+spec:
+  to:
+    kind: Service
+    name: api
+  port:
+    targetPort: endpoint
+  tls:
+    termination: edge
