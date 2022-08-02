@@ -1,0 +1,19 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: api
+  labels:
+    app.kubernetes.io/name: drogue-ajour
+    app.kubernetes.io/instance: ajour
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: drogue-ajour
+    app.kubernetes.io/instance: ajour
+    app.kubernetes.io/component: api
+  type: ClusterIP
+  ports:
+    - name: endpoint
+      protocol: TCP
+      port: 8080
+      targetPort: endpoint
