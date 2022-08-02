@@ -1,10 +1,10 @@
 use actix_web::{
-    get, middleware, web, App, HttpRequest, HttpResponse, HttpResponseBuilder, HttpServer,
-    Responder,
+    middleware, web, App, HttpRequest, HttpResponse, HttpResponseBuilder, HttpServer, Responder,
 };
 use ajour_schema::*;
 use anyhow::anyhow;
 use chrono::{offset::Utc, DateTime};
+use clap::Parser;
 use drogue_client::core::v1::Conditions;
 use drogue_client::openid::AccessTokenProvider;
 use drogue_client::{
@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 pub struct State {
     config: ApiConfig,
@@ -109,8 +108,6 @@ impl State {
                 .kube
                 .list(&ListParams::default().labels(&format!("application={}", app.metadata.name)))
                 .await?;
-
-            log::info!("Builds for {}: {:?}", app.metadata.name, builds);
 
             // Find all devices for this app
             let devs: Vec<Device> = self
@@ -238,13 +235,38 @@ impl State {
     }
 }
 
+#[derive(Parser, Debug)]
+struct Args {
+    /// Device registry URL
+    /// Mqtt server uri (tcp://host:port)
+    #[clap(long)]
+    device_registry: String,
+
+    /// Kubernetes namespace
+    #[clap(long)]
+    namespace: String,
+
+    /// Token for authenticating ajour to Drogue IoT
+    #[clap(long)]
+    token: String,
+
+    /// User for authenticating ajour to Drogue IoT
+    #[clap(long)]
+    user: String,
+
+    /// Port for health endpoint
+    #[clap(long, default_value_t = 8080)]
+    port: u16,
+}
+
 #[actix_web::main]
 async fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
-    let token = std::env::var("ACCESS_TOKEN").unwrap();
-    let user = std::env::var("USER").unwrap();
-    let namespace = std::env::var("NAMESPACE").unwrap();
-    let registry_url = reqwest::Url::parse(&std::env::var("REGISTRY_URL").unwrap()).unwrap();
+    let args = Args::parse();
+    let token = args.token;
+    let user = args.user;
+    let namespace = args.namespace;
+    let registry_url = reqwest::Url::parse(&args.device_registry).unwrap();
 
     let tp = AccessTokenProvider {
         user: user.to_string(),
@@ -281,6 +303,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .wrap(middleware::Logger::default())
             .app_data(web::JsonConfig::default().limit(4096))
             .app_data(web::Data::new(state.clone()))
+            .service(web::resource("/healthz").route(web::get().to(healthz)))
             .service(web::resource("/api/build/v1alpha1").route(web::get().to(get_builds)))
             .service(
                 web::scope("/api/build/v1alpha1/apps/{appId}")
@@ -291,7 +314,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     ),
             )
     })
-    .bind(("127.0.0.1", 8088))?
+    .bind(("127.0.0.1", args.port))?
     .run()
     .await?;
     Ok(())
@@ -303,6 +326,12 @@ fn build_name(app: &str, dev: Option<&str>) -> String {
     } else {
         format!("app-{}", app)
     }
+}
+
+async fn healthz(_request: HttpRequest) -> impl Responder {
+    HttpResponse::Ok().json(json!({
+        "status": "OK"
+    }))
 }
 
 async fn get_builds(state: web::Data<Arc<State>>, _request: HttpRequest) -> impl Responder {
@@ -318,7 +347,6 @@ async fn trigger_app_build(
     _request: HttpRequest,
     app_id: web::Path<String>,
 ) -> impl Responder {
-    log::info!("APP: {}", app_id);
     match state.get_app(&app_id).await {
         Ok(None) => HttpResponse::NotFound(),
         Ok(Some(app)) => {
@@ -370,8 +398,6 @@ async fn trigger_device_build(
     _request: HttpRequest,
     ids: web::Path<(String, String)>,
 ) -> impl Responder {
-    log::info!("APP: {}", ids.0);
-    log::info!("DEVICE: {}", ids.1);
     match state.get_device(&ids.0, &ids.1).await {
         Ok(None) => HttpResponse::NotFound(),
         Ok(Some(dev)) => {

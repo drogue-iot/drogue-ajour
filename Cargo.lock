@@ -836,6 +836,7 @@ dependencies = [
  "ajour-schema",
  "anyhow",
  "chrono",
+ "clap",
  "drogue-client",
  "env_logger",
  "k8s-openapi",
