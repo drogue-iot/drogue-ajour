@@ -77,19 +77,19 @@ jobs:
 
       - name: Build (linux/amd64)
         run: |
-          docker buildx build server --platform linux/amd64 --tag $IMAGE_ID:$VERSION
+          docker buildx build . --platform linux/amd64 -f server/Dockerfile --tag $IMAGE_ID:$VERSION
           echo "platforms=${{ env.platforms }}linux/amd64," >> $GITHUB_ENV
 
       - name: Build (linux/arm64)
         run: |
-          docker buildx build server --platform linux/arm64 --tag $IMAGE_ID:$VERSION
+          docker buildx build . --platform linux/arm64 -f server/Dockerfile --tag $IMAGE_ID:$VERSION
           echo "platforms=${{ env.platforms }}linux/arm64," >> $GITHUB_ENV
 
       - name: Tag and Push
         run: |
           PLATFORMS=$(echo "${{ env.platforms }}" | sed 's/,$//') 
           echo "Platforms: $PLATFORMS"
-          docker buildx build server --push --platform $PLATFORMS --tag $IMAGE_ID:$VERSION
+          docker buildx build . --push --platform $PLATFORMS -f server/Dockerfile --tag $IMAGE_ID:$VERSION
 
   publish-api:
     env:
@@ -137,19 +137,19 @@ jobs:
 
       - name: Build (linux/amd64)
         run: |
-          docker buildx build api --platform linux/amd64 --tag $IMAGE_ID:$VERSION
+          docker buildx build . --platform linux/amd64 -f api/Dockerfile --tag $IMAGE_ID:$VERSION
           echo "platforms=${{ env.platforms }}linux/amd64," >> $GITHUB_ENV
 
       - name: Build (linux/arm64)
         run: |
-          docker buildx build api --platform linux/arm64 --tag $IMAGE_ID:$VERSION
+          docker buildx build . --platform linux/arm64 -f api/Dockerfile --tag $IMAGE_ID:$VERSION
           echo "platforms=${{ env.platforms }}linux/arm64," >> $GITHUB_ENV
 
       - name: Tag and Push
         run: |
           PLATFORMS=$(echo "${{ env.platforms }}" | sed 's/,$//') 
           echo "Platforms: $PLATFORMS"
-          docker buildx build api --push --platform $PLATFORMS --tag $IMAGE_ID:$VERSION
+          docker buildx build . --push --platform $PLATFORMS -f api/Dockerfile --tag $IMAGE_ID:$VERSION
 
   publish-console:
     env:
@@ -197,16 +197,16 @@ jobs:
 
       - name: Build (linux/amd64)
         run: |
-          docker buildx build console --platform linux/amd64 --tag $IMAGE_ID:$VERSION
+          docker buildx build . --platform linux/amd64 -f console/Dockerfile --tag $IMAGE_ID:$VERSION
           echo "platforms=${{ env.platforms }}linux/amd64," >> $GITHUB_ENV
 
       - name: Build (linux/arm64)
         run: |
-          docker buildx build console --platform linux/arm64 --tag $IMAGE_ID:$VERSION
+          docker buildx build . --platform linux/arm64 -f console/Dockerfile --tag $IMAGE_ID:$VERSION
           echo "platforms=${{ env.platforms }}linux/arm64," >> $GITHUB_ENV
 
       - name: Tag and Push
         run: |
           PLATFORMS=$(echo "${{ env.platforms }}" | sed 's/,$//')
           echo "Platforms: $PLATFORMS"
-          docker buildx build console --push --platform $PLATFORMS --tag $IMAGE_ID:$VERSION
+          docker buildx build . --push --platform $PLATFORMS -f console/Dockerfile --tag $IMAGE_ID:$VERSION
