@@ -32,28 +32,33 @@ pub enum FirmwareSpec {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FirmwareBuildSpec {
-    image: String,
-    source: FirmwareBuildSource,
-    env: Vec<FirmwareBuildEnv>,
-    args: Vec<String>,
-    artifact: FirmwareBuildArtifact,
+    pub image: String,
+    pub source: FirmwareBuildSource,
+    pub env: Vec<FirmwareBuildEnv>,
+    pub args: Vec<String>,
+    pub artifact: FirmwareBuildArtifact,
+    pub timeout: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FirmwareBuildEnv {
-    name: String,
-    value: String,
+    pub name: String,
+    pub value: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum FirmwareBuildSource {
     #[serde(rename = "git")]
-    GIT { uri: String, project: String },
+    GIT {
+        uri: String,
+        project: String,
+        rev: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FirmwareBuildArtifact {
-    path: String,
+    pub path: String,
 }
 
 dialect!(FirmwareStatus [Section::Status => "firmware"]);
