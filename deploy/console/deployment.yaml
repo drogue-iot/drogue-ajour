@@ -36,17 +36,17 @@ spec:
           - name: run
             mountPath: /run
         env:
-          - name: DROGUE_API_URL
+          - name: API_URL
             valueFrom:
               secretKeyRef:
                 name: drogue-config
                 key: api-url
-          - name: DROGUE_ISSUER_URL
+          - name: ISSUER_URL
             valueFrom:
               secretKeyRef:
                 name: drogue-config
                 key: issuer-url
-          - name: DROGUE_CLIENT_ID
+          - name: CLIENT_ID
             valueFrom:
               secretKeyRef:
                 name: drogue-config
