@@ -1,12 +1,12 @@
 use actix_web::{
-    middleware, web, App, HttpRequest, HttpResponse, HttpResponseBuilder, HttpServer, Responder,
+    http::header::Header, middleware, web, App, HttpRequest, HttpResponse, HttpResponseBuilder,
+    HttpServer, Responder,
 };
 use ajour_schema::*;
 use anyhow::anyhow;
 use chrono::{offset::Utc, DateTime};
 use clap::Parser;
 use drogue_client::core::v1::Conditions;
-use drogue_client::openid::AccessTokenProvider;
 use drogue_client::{
     registry::v1::{Application, Client as DrogueClient, Device},
     Translator,
@@ -17,16 +17,28 @@ use kube::{
     discovery, Api, Resource,
 };
 use kube::{Client as KubeClient, ResourceExt};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-pub struct State {
-    config: ApiConfig,
-    drogue: DrogueClient,
-    kube: Api<DynamicObject>,
-    pipeline_run_resource: ApiResource,
+use actix_web_httpauth::headers::authorization::{Authorization, Bearer};
+
+#[derive(Parser, Debug)]
+struct Args {
+    /// Device registry URL
+    /// Mqtt server uri (tcp://host:port)
+    #[clap(long)]
+    device_registry: String,
+
+    /// Kubernetes namespace
+    #[clap(long)]
+    namespace: String,
+
+    /// Port for health endpoint
+    #[clap(long, default_value_t = 8080)]
+    port: u16,
 }
 
 pub struct ApiConfig {
@@ -34,6 +46,174 @@ pub struct ApiConfig {
     pipeline: String,
     volume_size: String,
     service_account: String,
+}
+
+#[actix_web::main]
+async fn main() -> Result<(), anyhow::Error> {
+    env_logger::init();
+    let args = Args::parse();
+    let namespace = args.namespace;
+    let registry_url = reqwest::Url::parse(&args.device_registry).unwrap();
+
+    const GROUP_TEKTON_DEV: &str = "tekton.dev";
+    const KIND_PIPELINE_RUN: &str = "PipelineRun";
+
+    let kube = KubeClient::try_default().await?;
+    let group = discovery::group(&kube, GROUP_TEKTON_DEV).await?;
+    let (pipeline_run_resource, _caps) = group
+        .recommended_kind(KIND_PIPELINE_RUN)
+        .ok_or_else(|| anyhow!("Unable to discover '{}'", KIND_PIPELINE_RUN))?;
+    let pipeline_runs =
+        Api::<DynamicObject>::namespaced_with(kube.clone(), &namespace, &pipeline_run_resource);
+
+    let config = ApiConfig {
+        service_account: "pipeline".to_string(),
+        pipeline: "oci-firmware".to_string(),
+        volume_size: "10Gi".to_string(),
+        namespace,
+    };
+
+    let state = Arc::new(State::new(
+        config,
+        registry_url,
+        pipeline_runs,
+        pipeline_run_resource,
+    ));
+    log::info!("API starting");
+    HttpServer::new(move || {
+        App::new()
+            .wrap(middleware::Logger::default())
+            .app_data(web::JsonConfig::default().limit(4096))
+            .app_data(web::Data::new(state.clone()))
+            .service(web::resource("/healthz").route(web::get().to(healthz)))
+            .service(web::resource("/api/build/v1alpha1").route(web::get().to(get_builds)))
+            .service(
+                web::scope("/api/build/v1alpha1/apps/{appId}")
+                    .service(web::resource("/trigger").route(web::post().to(trigger_app_build)))
+                    .service(
+                        web::resource("/devices/{deviceId}/trigger")
+                            .route(web::post().to(trigger_device_build)),
+                    ),
+            )
+    })
+    .bind(("127.0.0.1", args.port))?
+    .run()
+    .await?;
+    Ok(())
+}
+
+fn build_name(app: &str, dev: Option<&str>) -> String {
+    if let Some(dev) = dev {
+        format!("dev-{}-{}", app, dev)
+    } else {
+        format!("app-{}", app)
+    }
+}
+
+async fn healthz(_request: HttpRequest) -> impl Responder {
+    HttpResponse::Ok().json(json!({
+        "status": "OK"
+    }))
+}
+
+fn extract_token(request: HttpRequest) -> Option<String> {
+    if let Ok(auth) = Authorization::<Bearer>::parse(&request) {
+        Some(auth.into_scheme().token().to_string())
+    } else {
+        None
+    }
+}
+
+async fn get_builds(state: web::Data<Arc<State>>, request: HttpRequest) -> impl Responder {
+    if let Some(token) = extract_token(request) {
+        if let Ok(builds) = state.get_builds(&token).await {
+            HttpResponse::Ok().json(builds)
+        } else {
+            HttpResponse::Ok().finish()
+        }
+    } else {
+        HttpResponse::BadRequest().finish()
+    }
+}
+
+async fn trigger_app_build(
+    state: web::Data<Arc<State>>,
+    request: HttpRequest,
+    app_id: web::Path<String>,
+) -> impl Responder {
+    if let Some(token) = extract_token(request) {
+        match state.get_app(&token, &app_id).await {
+            Ok(None) => HttpResponse::NotFound(),
+            Ok(Some(app)) => {
+                if let Some(Ok(spec)) = app.section::<FirmwareSpec>() {
+                    trigger_build(state, &app_id, None, spec).await
+                } else {
+                    HttpResponse::NotFound()
+                }
+            }
+            Err(e) => {
+                log::warn!("Unable to trigger build: {:?}", e);
+                HttpResponse::InternalServerError()
+            }
+        }
+    } else {
+        HttpResponse::BadRequest()
+    }
+}
+
+async fn trigger_build(
+    state: web::Data<Arc<State>>,
+    app: &str,
+    dev: Option<&str>,
+    spec: FirmwareSpec,
+) -> HttpResponseBuilder {
+    match spec {
+        FirmwareSpec::OCI {
+            image,
+            image_pull_policy: _,
+            build,
+        } => {
+            if let Some(build) = build {
+                if let Err(e) = state.trigger(app, dev, &image, build).await {
+                    log::warn!("Error triggering build: {:?}", e);
+                    HttpResponse::InternalServerError()
+                } else {
+                    HttpResponse::Ok()
+                }
+            } else {
+                HttpResponse::NotFound()
+            }
+        }
+        _ => {
+            log::info!("Firmware registry not yet supported for builds");
+            HttpResponse::NotImplemented()
+        }
+    }
+}
+
+async fn trigger_device_build(
+    state: web::Data<Arc<State>>,
+    request: HttpRequest,
+    ids: web::Path<(String, String)>,
+) -> impl Responder {
+    if let Some(token) = extract_token(request) {
+        match state.get_device(&token, &ids.0, &ids.1).await {
+            Ok(None) => HttpResponse::NotFound(),
+            Ok(Some(dev)) => {
+                if let Some(Ok(spec)) = dev.section::<FirmwareSpec>() {
+                    trigger_build(state, &ids.0, Some(&ids.1), spec).await
+                } else {
+                    HttpResponse::NotFound()
+                }
+            }
+            Err(e) => {
+                log::warn!("Unable to trigger build: {:?}", e);
+                HttpResponse::InternalServerError()
+            }
+        }
+    } else {
+        HttpResponse::BadRequest()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -80,23 +260,36 @@ impl BuildInfo {
     }
 }
 
+pub struct State {
+    config: ApiConfig,
+    device_registry: Url,
+    kube: Api<DynamicObject>,
+    pipeline_run_resource: ApiResource,
+}
+
 impl State {
     pub fn new(
         config: ApiConfig,
-        drogue: DrogueClient,
+        device_registry: Url,
         kube: Api<DynamicObject>,
         pipeline_run_resource: ApiResource,
     ) -> Self {
         Self {
             config,
-            drogue,
+            device_registry,
             kube,
             pipeline_run_resource,
         }
     }
 
-    async fn get_builds(&self) -> Result<Vec<BuildInfo>, anyhow::Error> {
-        let apps = self.drogue.list_apps(None).await?;
+    //    let drogue = DrogueClient::new(reqwest::Client::new(), registry_url, tp);
+    async fn get_builds(&self, token: &str) -> Result<Vec<BuildInfo>, anyhow::Error> {
+        let drogue = DrogueClient::new(
+            reqwest::Client::new(),
+            self.device_registry.clone(),
+            token.to_string(),
+        );
+        let apps = drogue.list_apps(None).await?;
         let apps = apps.ok_or(anyhow!("Unable to find any apps"))?;
 
         let mut all_builds = Vec::new();
@@ -110,8 +303,7 @@ impl State {
                 .await?;
 
             // Find all devices for this app
-            let devs: Vec<Device> = self
-                .drogue
+            let devs: Vec<Device> = drogue
                 .list_devices(&app.metadata.name, None)
                 .await?
                 .unwrap_or(Vec::new());
@@ -141,13 +333,28 @@ impl State {
         Ok(all_builds)
     }
 
-    async fn get_app(&self, app: &str) -> Result<Option<Application>, anyhow::Error> {
-        let app = self.drogue.get_app(app).await?;
+    async fn get_app(&self, token: &str, app: &str) -> Result<Option<Application>, anyhow::Error> {
+        let drogue = DrogueClient::new(
+            reqwest::Client::new(),
+            self.device_registry.clone(),
+            token.to_string(),
+        );
+        let app = drogue.get_app(app).await?;
         Ok(app)
     }
 
-    async fn get_device(&self, app: &str, device: &str) -> Result<Option<Device>, anyhow::Error> {
-        let dev = self.drogue.get_device(app, device).await?;
+    async fn get_device(
+        &self,
+        token: &str,
+        app: &str,
+        device: &str,
+    ) -> Result<Option<Device>, anyhow::Error> {
+        let drogue = DrogueClient::new(
+            reqwest::Client::new(),
+            self.device_registry.clone(),
+            token.to_string(),
+        );
+        let dev = drogue.get_device(app, device).await?;
         Ok(dev)
     }
 
@@ -232,184 +439,5 @@ impl State {
 
         self.kube.create(&Default::default(), &run).await?;
         Ok(())
-    }
-}
-
-#[derive(Parser, Debug)]
-struct Args {
-    /// Device registry URL
-    /// Mqtt server uri (tcp://host:port)
-    #[clap(long)]
-    device_registry: String,
-
-    /// Kubernetes namespace
-    #[clap(long)]
-    namespace: String,
-
-    /// Token for authenticating ajour to Drogue IoT
-    #[clap(long)]
-    token: String,
-
-    /// User for authenticating ajour to Drogue IoT
-    #[clap(long)]
-    user: String,
-
-    /// Port for health endpoint
-    #[clap(long, default_value_t = 8080)]
-    port: u16,
-}
-
-#[actix_web::main]
-async fn main() -> Result<(), anyhow::Error> {
-    env_logger::init();
-    let args = Args::parse();
-    let token = args.token;
-    let user = args.user;
-    let namespace = args.namespace;
-    let registry_url = reqwest::Url::parse(&args.device_registry).unwrap();
-
-    let tp = AccessTokenProvider {
-        user: user.to_string(),
-        token: token.to_string(),
-    };
-    let drogue = DrogueClient::new(reqwest::Client::new(), registry_url, tp);
-
-    const GROUP_TEKTON_DEV: &str = "tekton.dev";
-    const KIND_PIPELINE_RUN: &str = "PipelineRun";
-
-    let kube = KubeClient::try_default().await?;
-    let group = discovery::group(&kube, GROUP_TEKTON_DEV).await?;
-    let (pipeline_run_resource, _caps) = group
-        .recommended_kind(KIND_PIPELINE_RUN)
-        .ok_or_else(|| anyhow!("Unable to discover '{}'", KIND_PIPELINE_RUN))?;
-    let pipeline_runs =
-        Api::<DynamicObject>::namespaced_with(kube.clone(), &namespace, &pipeline_run_resource);
-
-    let config = ApiConfig {
-        service_account: "pipeline".to_string(),
-        pipeline: "oci-firmware".to_string(),
-        volume_size: "10Gi".to_string(),
-        namespace,
-    };
-
-    let state = Arc::new(State::new(
-        config,
-        drogue,
-        pipeline_runs,
-        pipeline_run_resource,
-    ));
-    HttpServer::new(move || {
-        App::new()
-            .wrap(middleware::Logger::default())
-            .app_data(web::JsonConfig::default().limit(4096))
-            .app_data(web::Data::new(state.clone()))
-            .service(web::resource("/healthz").route(web::get().to(healthz)))
-            .service(web::resource("/api/build/v1alpha1").route(web::get().to(get_builds)))
-            .service(
-                web::scope("/api/build/v1alpha1/apps/{appId}")
-                    .service(web::resource("/trigger").route(web::post().to(trigger_app_build)))
-                    .service(
-                        web::resource("/devices/{deviceId}/trigger")
-                            .route(web::post().to(trigger_device_build)),
-                    ),
-            )
-    })
-    .bind(("127.0.0.1", args.port))?
-    .run()
-    .await?;
-    Ok(())
-}
-
-fn build_name(app: &str, dev: Option<&str>) -> String {
-    if let Some(dev) = dev {
-        format!("dev-{}-{}", app, dev)
-    } else {
-        format!("app-{}", app)
-    }
-}
-
-async fn healthz(_request: HttpRequest) -> impl Responder {
-    HttpResponse::Ok().json(json!({
-        "status": "OK"
-    }))
-}
-
-async fn get_builds(state: web::Data<Arc<State>>, _request: HttpRequest) -> impl Responder {
-    if let Ok(builds) = state.get_builds().await {
-        HttpResponse::Ok().json(builds)
-    } else {
-        HttpResponse::Ok().finish()
-    }
-}
-
-async fn trigger_app_build(
-    state: web::Data<Arc<State>>,
-    _request: HttpRequest,
-    app_id: web::Path<String>,
-) -> impl Responder {
-    match state.get_app(&app_id).await {
-        Ok(None) => HttpResponse::NotFound(),
-        Ok(Some(app)) => {
-            if let Some(Ok(spec)) = app.section::<FirmwareSpec>() {
-                trigger_build(state, &app_id, None, spec).await
-            } else {
-                HttpResponse::NotFound()
-            }
-        }
-        Err(e) => {
-            log::warn!("Unable to trigger build: {:?}", e);
-            HttpResponse::InternalServerError()
-        }
-    }
-}
-
-async fn trigger_build(
-    state: web::Data<Arc<State>>,
-    app: &str,
-    dev: Option<&str>,
-    spec: FirmwareSpec,
-) -> HttpResponseBuilder {
-    match spec {
-        FirmwareSpec::OCI {
-            image,
-            image_pull_policy: _,
-            build,
-        } => {
-            if let Some(build) = build {
-                if let Err(e) = state.trigger(app, dev, &image, build).await {
-                    log::warn!("Error triggering build: {:?}", e);
-                    HttpResponse::InternalServerError()
-                } else {
-                    HttpResponse::Ok()
-                }
-            } else {
-                HttpResponse::NotFound()
-            }
-        }
-        _ => {
-            log::info!("Firmware registry not yet supported for builds");
-            HttpResponse::NotImplemented()
-        }
-    }
-}
-
-async fn trigger_device_build(
-    state: web::Data<Arc<State>>,
-    _request: HttpRequest,
-    ids: web::Path<(String, String)>,
-) -> impl Responder {
-    match state.get_device(&ids.0, &ids.1).await {
-        Ok(None) => HttpResponse::NotFound(),
-        Ok(Some(dev)) => {
-            if let Some(Ok(spec)) = dev.section::<FirmwareSpec>() {
-                trigger_build(state, &ids.0, Some(&ids.1), spec).await
-            } else {
-                HttpResponse::NotFound()
-            }
-        }
-        Err(e) => {
-            log::warn!("Unable to trigger build: {:?}", e);
-            HttpResponse::InternalServerError()
-        }
     }
 }
