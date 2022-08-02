@@ -2,7 +2,7 @@ FROM --platform=$BUILDPLATFORM ghcr.io/drogue-iot/builder:0.1.20 as builder
 
 RUN mkdir /build
 ADD . /build
-WORKDIR /build
+WORKDIR /build/server
 
 RUN cargo build --release
 
