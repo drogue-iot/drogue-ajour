@@ -1,5 +1,6 @@
 {
     "client_id": "${CLIENT_ID}",
     "issuer_url": "${ISSUER_URL}",
-    "api_url": "${API_URL}"
+    "drogue_api_url": "${DROGUE_API_URL}",
+    "ajour_api_url": "${AJOUR_API_URL}"
 }

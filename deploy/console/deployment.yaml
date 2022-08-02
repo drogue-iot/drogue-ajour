@@ -36,7 +36,7 @@ spec:
           - name: run
             mountPath: /run
         env:
-          - name: API_URL
+          - name: DROGUE_API_URL
             valueFrom:
               secretKeyRef:
                 name: drogue-config
@@ -51,6 +51,11 @@ spec:
               secretKeyRef:
                 name: drogue-config
                 key: client-id
+          - name: AJOUR_API_URL
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: ajour-api-url
         ports:
         - name: endpoint
           containerPort: 8080

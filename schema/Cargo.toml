@@ -6,5 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-drogue-client = "0.10"
+drogue-client = { version = "0.10", default-features = false }
 serde = {version = "1", features = ["derive"] }
+chrono = { version = "0.4" }

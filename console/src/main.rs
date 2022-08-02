@@ -18,16 +18,19 @@ use yew_oauth2::openid::Client;
 
 mod applications;
 mod bindings;
+mod builds;
 mod data;
 mod devices;
 mod fetcher;
 mod overview;
 mod progress;
+mod toast;
 mod types;
 
 use applications::ApplicationOverview;
+use builds::BuildOverview;
 use devices::DeviceOverview;
-use fetcher::DataFetcher;
+use fetcher::{DataFetcher, FetcherInput};
 use overview::Overview;
 
 pub struct App {
@@ -41,6 +44,8 @@ enum AppRoute {
     ApplicationOverview,
     #[to = "/devices"]
     DeviceOverview,
+    #[to = "/builds"]
+    BuildOverview,
     #[to = "/"]
     Overview,
 }
@@ -49,7 +54,8 @@ enum AppRoute {
 pub struct BackendConfig {
     client_id: String,
     issuer_url: String,
-    api_url: String,
+    drogue_api_url: String,
+    ajour_api_url: String,
 }
 
 #[derive(Debug)]
@@ -109,7 +115,7 @@ impl Component for App {
         let bridge = SharedDataBridge::from(ctx.link(), AppMsg::BackendConfig);
         wasm_bindgen_futures::spawn_local(async move {
             let config: BackendConfig = fetch_info().await.unwrap();
-            SharedDataDispatcher::new().set(Some(config));
+            SharedDataDispatcher::new().set(Some(config.clone()));
         });
         Self {
             _bridge: bridge,
@@ -145,7 +151,7 @@ impl Component for App {
                     <Authenticated>
                         <BackdropViewer/>
                         <ToastViewer/>
-                        <AuthenticatedApp />
+                        <AuthenticatedApp config={config.clone()}/>
                     </Authenticated>
                     <NotAuthenticated>
                         <BackdropViewer/>
@@ -176,9 +182,14 @@ pub enum Msg {
     LoggedOut,
 }
 
+#[derive(Properties, PartialEq)]
+pub struct AuthProps {
+    config: BackendConfig,
+}
+
 impl Component for AuthenticatedApp {
     type Message = Msg;
-    type Properties = ();
+    type Properties = AuthProps;
     fn create(ctx: &Context<Self>) -> Self {
         let mut fetcher = DataFetcher::dispatcher();
         let (auth, handle) = match ctx
@@ -190,7 +201,7 @@ impl Component for AuthenticatedApp {
         };
 
         if let Some(auth) = &auth {
-            fetcher.send(auth.clone());
+            fetcher.send(FetcherInput::Oauth2(auth.clone()));
         }
         Self {
             fetcher,
@@ -203,8 +214,7 @@ impl Component for AuthenticatedApp {
         match msg {
             Msg::Context(auth) => {
                 self.auth.replace(auth.clone());
-                log::info!("GOT NEW CONTEXT");
-                self.fetcher.send(auth);
+                self.fetcher.send(FetcherInput::Oauth2(auth));
             }
             Msg::LoggedOut => {}
         }
@@ -270,10 +280,15 @@ impl Component for AuthenticatedApp {
             }
         }];
 
+        let config = ctx.props().config.clone();
         let render = Router::render(move |switch: AppRoute| match switch {
             AppRoute::Overview => page(tools.clone(), html! {<Overview/>}),
             AppRoute::ApplicationOverview => page(tools.clone(), html! {<ApplicationOverview/>}),
             AppRoute::DeviceOverview => page(tools.clone(), html! {<DeviceOverview/>}),
+            AppRoute::BuildOverview => page(
+                tools.clone(),
+                html! {<BuildOverview config={config.clone()}/>},
+            ),
         });
 
         html! {
@@ -351,6 +366,7 @@ fn page(tools: Vec<VNode>, html: Html) -> Html {
                 <NavRouterExpandable<AppRoute> title="Firmware" expanded=true>
                     <NavRouterItem<AppRoute> to={AppRoute::ApplicationOverview}>{"Applications"}</NavRouterItem<AppRoute>>
                     <NavRouterItem<AppRoute> to={AppRoute::DeviceOverview}>{"Devices"}</NavRouterItem<AppRoute>>
+                    <NavRouterItem<AppRoute> to={AppRoute::BuildOverview}>{"Builds"}</NavRouterItem<AppRoute>>
                 </NavRouterExpandable<AppRoute>>
             </Nav>
         </PageSidebar>
