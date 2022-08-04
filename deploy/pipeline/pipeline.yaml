@@ -65,7 +65,7 @@ spec:
       params:
         - name: IMAGE
           #value: $(params.REGISTRY)/$(params.IMAGE):$(tasks.firmware-build.results.revision)
-          value: $(params.REGISTRY)/$(params.IMAGE):$(params.GIT_REVISION)
+          value: $(params.REGISTRY)/$(params.IMAGE) #:$(params.GIT_REVISION)
         - name: DOCKERFILE
           value: $(workspaces.source.path)/$(params.PROJECT_PATH)/Dockerfile
         - name: CONTEXT
