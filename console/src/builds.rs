@@ -119,7 +119,7 @@ impl Component for BuildOverview {
         };
 
         let trigger_builds = ctx.link().callback(|_| Msg::TriggerBuilds);
-        let models: Vec<BuildModel> = self
+        let mut models: Vec<BuildModel> = self
             .builds
             .iter()
             .map(|build| {
@@ -133,6 +133,11 @@ impl Component for BuildOverview {
                 model
             })
             .collect();
+        models.sort_by(|a, b| {
+            let a = (&a.app, &a.device);
+            let b = (&b.app, &b.device);
+            a.partial_cmp(&b).unwrap()
+        });
         let model: SharedTableModel<BuildModel> = models.into();
 
         html! {
