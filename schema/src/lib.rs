@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use drogue_client::{core::v1::Conditions, dialect, Section};
 use serde::{Deserialize, Serialize};
 
@@ -77,6 +78,19 @@ pub struct FirmwareStatus {
     pub conditions: Conditions,
     pub current: String,
     pub target: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct BuildInfo {
+    pub app: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
 }
 
 #[cfg(test)]

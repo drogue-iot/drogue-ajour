@@ -6,7 +6,8 @@ mkdir -p "${TRUNK_STAGING_DIR}/endpoints"
 cat<<EOF > ${TRUNK_STAGING_DIR}/endpoints/backend.json
 {
     "client_id": "drogue",
-    "issuer_url": "https://sso.sandbox.drogue.cloud/auth/realms/drogue",
-    "api_url": "https://api.sandbox.drogue.cloud"
+    "issuer_url": "https://sso.sandbox.drogue.cloud/realms/drogue",
+    "drogue_api_url": "https://api.sandbox.drogue.cloud",
+    "ajour_api_url": "http://localhost:8080"
 }
 EOF

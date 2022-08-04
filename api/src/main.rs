@@ -1,7 +1,9 @@
+use actix_cors::Cors;
 use actix_web::{
     http::header::Header, middleware, web, App, HttpRequest, HttpResponse, HttpResponseBuilder,
     HttpServer, Responder,
 };
+use ajour_schema::BuildInfo;
 use ajour_schema::*;
 use anyhow::anyhow;
 use chrono::{offset::Utc, DateTime};
@@ -20,6 +22,7 @@ use kube::{Client as KubeClient, ResourceExt};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -83,6 +86,7 @@ async fn main() -> Result<(), anyhow::Error> {
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
+            .wrap(Cors::permissive())
             .app_data(web::JsonConfig::default().limit(4096))
             .app_data(web::Data::new(state.clone()))
             .service(web::resource("/healthz").route(web::get().to(healthz)))
@@ -216,48 +220,22 @@ async fn trigger_device_build(
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct BuildInfo {
-    app: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    device: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    started: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    completed: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    status: Option<String>,
-}
+fn update_build_status(info: &mut BuildInfo, object: &DynamicObject) -> Result<(), anyhow::Error> {
+    info.started = object.meta().creation_timestamp.clone().map(|s| s.0);
 
-impl BuildInfo {
-    fn parse(
-        app: &str,
-        device: Option<&str>,
-        object: &DynamicObject,
-    ) -> Result<BuildInfo, anyhow::Error> {
-        let started = object.meta().creation_timestamp.clone().map(|s| s.0);
-        let mut completed = None;
-        let mut status = None;
-        if let Some(s) = object.data.get("status") {
-            if let Some(conditions) = s.get("conditions") {
-                let conditions: Conditions = serde_json::from_value(conditions.clone())?;
-                for condition in conditions.iter() {
-                    if condition.r#type == "Succeeded" {
-                        status = condition.reason.clone();
-                        completed = Some(condition.last_transition_time);
-                        break;
-                    }
+    if let Some(s) = object.data.get("status") {
+        if let Some(conditions) = s.get("conditions") {
+            let conditions: Conditions = serde_json::from_value(conditions.clone())?;
+            for condition in conditions.iter() {
+                if condition.r#type == "Succeeded" {
+                    info.status = condition.reason.clone();
+                    info.completed = Some(condition.last_transition_time);
+                    break;
                 }
             }
         }
-        Ok(BuildInfo {
-            app: app.to_string(),
-            device: device.map(|s| s.to_string()),
-            started,
-            completed,
-            status,
-        })
     }
+    Ok(())
 }
 
 pub struct State {
@@ -292,44 +270,77 @@ impl State {
         let apps = drogue.list_apps(None).await?;
         let apps = apps.ok_or(anyhow!("Unable to find any apps"))?;
 
-        let mut all_builds = Vec::new();
+        let mut all_builds: Vec<BuildInfo> = Vec::new();
 
-        // First find all builds with app label
-        //
         for app in apps {
-            let builds: ObjectList<DynamicObject> = self
-                .kube
-                .list(&ListParams::default().labels(&format!("application={}", app.metadata.name)))
-                .await?;
-
             // Find all devices for this app
             let devs: Vec<Device> = drogue
                 .list_devices(&app.metadata.name, None)
                 .await?
                 .unwrap_or(Vec::new());
 
-            let devs: HashSet<String> =
-                HashSet::from_iter(devs.iter().map(|dev| dev.metadata.name.clone()));
+            let mut app_build = if has_build_spec(&app.section::<FirmwareSpec>()) {
+                Some(BuildInfo {
+                    app: app.metadata.name.clone(),
+                    device: None,
+                    started: None,
+                    status: None,
+                    completed: None,
+                })
+            } else {
+                None
+            };
 
-            // Filter builds for devices we have
+            let mut devs: HashMap<String, BuildInfo> = HashMap::from_iter(
+                devs.iter()
+                    .map(|dev| (dev.metadata.name.clone(), dev.section::<FirmwareSpec>()))
+                    .filter(|spec| has_build_spec(&spec.1))
+                    .map(|spec| {
+                        let name = spec.0.clone();
+                        let info = BuildInfo {
+                            app: app.metadata.name.clone(),
+                            device: Some(name.clone()),
+                            started: None,
+                            status: None,
+                            completed: None,
+                        };
+                        (name, info)
+                    }),
+            );
+
+            // Neither app nor devices have any build spec, skip
+            if app_build.is_none() && devs.is_empty() {
+                continue;
+            }
+
+            // Retrieve all build statuses for this app and its devs
+            let builds: ObjectList<DynamicObject> = self
+                .kube
+                .list(&ListParams::default().labels(&format!("application={}", app.metadata.name)))
+                .await?;
+
             for build in builds {
                 if let Some(labels) = &build.metadata.labels {
                     if let Some(device) = labels.get("device") {
-                        if devs.contains(device) {
-                            all_builds.push(BuildInfo::parse(
-                                &app.metadata.name,
-                                Some(device),
-                                &build,
-                            )?);
+                        if let Some(info) = devs.get_mut(device) {
+                            update_build_status(info, &build)?;
                         }
-                    } else if let Some(app_name) = labels.get("application") {
-                        if &app.metadata.name == app_name {
-                            all_builds.push(BuildInfo::parse(&app_name, None, &build)?);
+                    } else {
+                        // This is the app build
+                        if let Some(info) = &mut app_build {
+                            update_build_status(info, &build)?;
                         }
                     }
                 }
             }
+
+            if let Some(info) = app_build {
+                all_builds.push(info);
+            }
+
+            all_builds.extend(devs.values().cloned().collect::<Vec<BuildInfo>>());
         }
+
         Ok(all_builds)
     }
 
@@ -440,4 +451,16 @@ impl State {
         self.kube.create(&Default::default(), &run).await?;
         Ok(())
     }
+}
+
+fn has_build_spec(spec: &Option<Result<FirmwareSpec, serde_json::Error>>) -> bool {
+    if let Some(Ok(FirmwareSpec::OCI {
+        image: _,
+        image_pull_policy: _,
+        build,
+    })) = spec
+    {
+        return build.is_some();
+    }
+    return false;
 }

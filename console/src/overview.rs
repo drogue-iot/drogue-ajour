@@ -10,6 +10,7 @@ pub struct Overview {
     synced: usize,
     updating: usize,
     unknown: usize,
+    firmwares: usize,
     _bridge: SharedDataBridge<Data>,
 }
 
@@ -28,6 +29,7 @@ impl Component for Overview {
             synced: 0,
             updating: 0,
             unknown: 0,
+            firmwares: 0,
             _bridge: SharedDataBridge::from(ctx.link(), Msg::DataUpdated),
         }
     }
@@ -39,6 +41,7 @@ impl Component for Overview {
                 let mut synced = 0;
                 let mut updating = 0;
                 let mut unknown = 0;
+                let mut firmwares = 0;
                 for app in data.iter() {
                     for device in app.1.iter() {
                         let model: DeviceModel = device.into();
@@ -47,20 +50,47 @@ impl Component for Overview {
                             DeviceState::Updating(_) => updating += 1,
                             DeviceState::Unknown => unknown += 1,
                         }
+                        if model.has_build {
+                            log::info!("Device {} has build", model.name);
+                            firmwares += 1;
+                        }
                     }
                     devices += app.1.len();
+                    let model: ApplicationModel = app.into();
+                    if model.has_build {
+                        log::info!("App {} has build", model.name);
+                        firmwares += 1;
+                    }
                 }
                 self.apps = data.len();
                 self.devices = devices;
                 self.synced = synced;
                 self.updating = updating;
                 self.unknown = unknown;
+                self.firmwares = firmwares;
                 true
             }
         }
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
+        let app_title = if self.apps == 1 {
+            "Application"
+        } else {
+            "Applications"
+        };
+
+        let device_title = if self.devices == 1 {
+            "Device"
+        } else {
+            "Devices"
+        };
+
+        let build_title = if self.firmwares == 1 {
+            "Build"
+        } else {
+            "Builds"
+        };
         html! {
             <>
                 <PageSection variant={PageSectionVariant::Light} limit_width=true>
@@ -68,8 +98,9 @@ impl Component for Overview {
                 </PageSection>
                 <PageSection>
                 <Bullseye>
-                <Gauge id={"apps"} title={format!("{} Applications", self.apps)} values={vec![(100 as f32, ChartColor::DarkBlue.code().to_string(), None)]} class={"large"}/>
-                <Gauge id={"devices"} title={format!("{} Devices", self.devices)} values={vec![(self.synced as f32, ChartColor::DarkBlue.code().to_string(), Some("Synced".to_string())), (self.updating as f32, ChartColor::LightBlue.code().to_string(), Some("Updating".to_string())), (self.unknown as f32, ChartColor::DarkYellow.code().to_string(), Some("Unknown".to_string()))]} class={"large"}/>
+                <Gauge id={"apps"} title={format!("{} {}", self.apps, app_title)} values={vec![(100 as f32, ChartColor::DarkBlue.code().to_string(), None)]} class={"large"}/>
+                <Gauge id={"devices"} title={format!("{} {}", self.devices, device_title)} values={vec![(self.synced as f32, ChartColor::DarkBlue.code().to_string(), Some("Synced".to_string())), (self.updating as f32, ChartColor::LightBlue.code().to_string(), Some("Updating".to_string())), (self.unknown as f32, ChartColor::DarkYellow.code().to_string(), Some("Unknown".to_string()))]} class={"large"}/>
+                <Gauge id={"firmwares"} title={format!("{} {}", self.firmwares, build_title)} values={vec![(100 as f32, ChartColor::DarkBlue.code().to_string(), None)]} class={"large"}/>
                 </Bullseye>
                 </PageSection>
             </>

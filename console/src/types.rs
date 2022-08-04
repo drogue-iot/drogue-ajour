@@ -1,51 +1,16 @@
 use crate::progress::{ChartColor, Gauge};
+pub use ajour_schema::*;
+use chrono::{DateTime, Utc};
 use drogue_client::{
     core::v1::Conditions,
-    dialect,
     registry::v1::{Application, Device},
-    Section, Translator,
+    Translator,
 };
 use patternfly_yew::*;
-use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use yew::prelude::*;
 
 pub type Data = Vec<(Application, Vec<Device>)>;
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-pub enum ImagePullPolicy {
-    Always,
-    IfNotPresent,
-}
-
-impl Default for ImagePullPolicy {
-    fn default() -> Self {
-        Self::IfNotPresent
-    }
-}
-
-dialect!(FirmwareSpec [Section::Spec => "firmware"]);
-
-#[derive(Serialize, Deserialize, Debug)]
-pub enum FirmwareSpec {
-    #[serde(rename = "oci")]
-    OCI {
-        image: String,
-        #[serde(rename = "imagePullPolicy", default = "Default::default")]
-        image_pull_policy: ImagePullPolicy,
-    },
-    #[serde(rename = "hawkbit")]
-    HAWKBIT { controller: String },
-}
-
-dialect!(FirmwareStatus [Section::Status => "firmware"]);
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct FirmwareStatus {
-    conditions: Conditions,
-    current: String,
-    target: String,
-}
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct DeviceModel {
@@ -55,20 +20,23 @@ pub struct DeviceModel {
     pub conditions: Conditions,
     pub current: String,
     pub target: String,
+    pub has_build: bool,
 }
 
 impl From<&Device> for DeviceModel {
     fn from(device: &Device) -> Self {
-        let update_type = if let Some(Ok(spec)) = device.section::<FirmwareSpec>() {
+        let (update_type, has_build) = if let Some(Ok(spec)) = device.section::<FirmwareSpec>() {
             match spec {
                 FirmwareSpec::OCI {
                     image: _,
                     image_pull_policy: _,
-                } => "OCI".to_string(),
-                FirmwareSpec::HAWKBIT { controller: _ } => "Hawkbit".to_string(),
+                    build,
+                } => ("OCI".to_string(), build.is_some()),
+                FirmwareSpec::HAWKBIT { .. } => ("Hawkbit".to_string(), false),
+                FirmwareSpec::FILE { .. } => ("File".to_string(), false),
             }
         } else {
-            "Unspecified".to_string()
+            ("Unspecified".to_string(), false)
         };
 
         if let Some(Ok(status)) = device.section::<FirmwareStatus>() {
@@ -79,6 +47,7 @@ impl From<&Device> for DeviceModel {
                 conditions: status.conditions.clone(),
                 current: status.current.clone(),
                 target: status.target.clone(),
+                has_build,
             }
         } else {
             Self {
@@ -88,6 +57,7 @@ impl From<&Device> for DeviceModel {
                 conditions: Default::default(),
                 current: "Unknown".to_string(),
                 target: "Unknown".to_string(),
+                has_build,
             }
         }
     }
@@ -218,6 +188,7 @@ pub struct ApplicationModel {
     pub synced: usize,
     pub updating: usize,
     pub unknown: usize,
+    pub has_build: bool,
 }
 
 impl From<&(Application, Vec<Device>)> for ApplicationModel {
@@ -240,16 +211,18 @@ impl From<&(Application, Vec<Device>)> for ApplicationModel {
             }
         }
 
-        let update_type = if let Some(Ok(spec)) = app.section::<FirmwareSpec>() {
+        let (update_type, has_build) = if let Some(Ok(spec)) = app.section::<FirmwareSpec>() {
             match spec {
                 FirmwareSpec::OCI {
                     image: _,
                     image_pull_policy: _,
-                } => "OCI".to_string(),
-                FirmwareSpec::HAWKBIT { controller: _ } => "Hawkbit".to_string(),
+                    build,
+                } => ("OCI".to_string(), build.is_some()),
+                FirmwareSpec::HAWKBIT { .. } => ("Hawkbit".to_string(), false),
+                FirmwareSpec::FILE { .. } => ("File".to_string(), false),
             }
         } else {
-            "Unspecified".to_string()
+            ("Unspecified".to_string(), false)
         };
 
         Self {
@@ -259,6 +232,7 @@ impl From<&(Application, Vec<Device>)> for ApplicationModel {
             synced,
             updating,
             unknown,
+            has_build,
         }
     }
 }
@@ -315,6 +289,7 @@ impl TableRenderer for ApplicationModel {
                     html! {<></> }
                 }
             }
+
             _ => html! {},
         }
     }
@@ -323,6 +298,91 @@ impl TableRenderer for ApplicationModel {
         vec![Span::max(html! {
             <>
                 { "So many details for " }{ &self.name}
+            </>
+        })]
+    }
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct BuildModel {
+    pub app: String,
+    pub device: Option<String>,
+    pub started: Option<DateTime<Utc>>,
+    pub completed: Option<DateTime<Utc>>,
+    pub status: Option<String>,
+    pub on_select: Option<Callback<(String, Option<String>)>>,
+}
+
+impl From<&BuildInfo> for BuildModel {
+    fn from(info: &BuildInfo) -> Self {
+        Self {
+            app: info.app.clone(),
+            device: info.device.clone(),
+            started: info.started.clone(),
+            completed: info.completed.clone(),
+            status: info.status.clone(),
+            on_select: None,
+        }
+    }
+}
+
+impl TableRenderer for BuildModel {
+    fn render(&self, column: ColumnIndex) -> Html {
+        let _outline = false;
+        match column.index {
+            0 => {
+                if let Some(on_select) = &self.on_select {
+                    let app = self.app.clone();
+                    let device = self.device.clone();
+                    let on_select = on_select.clone();
+                    let cb = move |_| {
+                        on_select.emit((app.clone(), device.clone()));
+                    };
+                    html! {
+                        <>
+                            <input type="checkbox" onchange={cb} />
+                        </>
+                    }
+                } else {
+                    html! {}
+                }
+            }
+            1 => html! {{&self.app}},
+            2 => {
+                if let Some(device) = &self.device {
+                    html! {{device}}
+                } else {
+                    html! {{"N/A"}}
+                }
+            }
+            3 => {
+                if let Some(started) = &self.started {
+                    html! {{started}}
+                } else {
+                    html! {{"N/A"}}
+                }
+            }
+            4 => {
+                if let Some(completed) = &self.completed {
+                    html! {{completed}}
+                } else {
+                    html! {{"N/A"}}
+                }
+            }
+            5 => {
+                if let Some(status) = &self.status {
+                    html! {{status}}
+                } else {
+                    html! {{"N/A"}}
+                }
+            }
+            _ => html! {},
+        }
+    }
+
+    fn render_details(&self) -> Vec<Span> {
+        vec![Span::max(html! {
+            <>
             </>
         })]
     }
