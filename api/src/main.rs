@@ -109,7 +109,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     ),
             )
     })
-    .bind(("127.0.0.1", args.port))?
+    .bind(("0.0.0.0", args.port))?
     .run()
     .await?;
     Ok(())
