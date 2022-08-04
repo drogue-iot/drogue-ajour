@@ -214,19 +214,23 @@ async fn trigger_device_build(
     ids: web::Path<(String, String)>,
 ) -> impl Responder {
     if let Some(token) = extract_token(request) {
-        match state.get_device(&token, &ids.0, &ids.1).await {
-            Ok(None) => HttpResponse::NotFound(),
-            Ok(Some(dev)) => {
-                if let Some(Ok(spec)) = dev.section::<FirmwareSpec>() {
-                    trigger_build(state, &ids.0, Some(&ids.1), spec).await
-                } else {
-                    HttpResponse::NotFound()
+        if state.is_allowed(&ids.0) {
+            match state.get_device(&token, &ids.0, &ids.1).await {
+                Ok(None) => HttpResponse::NotFound(),
+                Ok(Some(dev)) => {
+                    if let Some(Ok(spec)) = dev.section::<FirmwareSpec>() {
+                        trigger_build(state, &ids.0, Some(&ids.1), spec).await
+                    } else {
+                        HttpResponse::NotFound()
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Unable to trigger build: {:?}", e);
+                    HttpResponse::InternalServerError()
                 }
             }
-            Err(e) => {
-                log::warn!("Unable to trigger build: {:?}", e);
-                HttpResponse::InternalServerError()
-            }
+        } else {
+            HttpResponse::Forbidden()
         }
     } else {
         HttpResponse::BadRequest()
@@ -398,11 +402,6 @@ impl State {
             FirmwareBuildSource::GIT { uri, rev, project } => (uri, rev, project),
         };
 
-        let build_args = if let Some(args) = spec.args {
-            args.join(" ")
-        } else {
-            String::new()
-        };
         let mut run =
             DynamicObject::new(&name, &self.pipeline_run_resource).within(&self.config.namespace);
 
@@ -418,29 +417,41 @@ impl State {
             log::info!("Deleted previous pipeline run {}", name);
         }
 
+        let mut params = vec![
+            FirmwareBuildEnv {
+                name: "GIT_REPO".to_string(),
+                value: git_repo,
+            },
+            FirmwareBuildEnv {
+                name: "GIT_REVISION".to_string(),
+                value: git_rev,
+            },
+            FirmwareBuildEnv {
+                name: "PROJECT_PATH".to_string(),
+                value: project_path,
+            },
+            FirmwareBuildEnv {
+                name: "IMAGE".to_string(),
+                value: image.to_string(),
+            },
+        ];
+
+        if let Some(args) = spec.args {
+            params.push(FirmwareBuildEnv {
+                name: "CARGO_BUILD_ARGS".to_string(),
+                value: args.join(" "),
+            });
+        }
+
+        if let Some(image) = spec.image {
+            params.push(FirmwareBuildEnv {
+                name: "BUILDER_IMAGE".to_string(),
+                value: image.to_string(),
+            });
+        }
+
         run.data["spec"] = json!({
-            "params": [
-                {
-                    "name": "GIT_REPO",
-                    "value": git_repo,
-                },
-                {
-                    "name": "GIT_REVISION",
-                    "value": git_rev,
-                },
-                {
-                    "name": "PROJECT_PATH",
-                    "value": project_path,
-                },
-                {
-                    "name": "IMAGE",
-                    "value": image,
-                },
-                {
-                    "name": "CARGO_BUILD_ARGS",
-                    "value": build_args,
-                },
-            ],
+            "params": params,
             "pipelineRef": {
                 "name": &self.config.pipeline,
             },
