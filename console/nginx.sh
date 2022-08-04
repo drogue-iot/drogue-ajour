@@ -22,7 +22,7 @@ if [ -z $AJOUR_API_URL ]; then
 fi
 
 echo "Using base config from file: $BACKEND_JSON_FILE"
-cat $BACKEND_JSON_FILE | jq --arg client_id "${CLIENT_ID}" '. + {client_id: $client_id}' | jq --arg issuer_url "${ISSUER_URL}" '. + {issuer_url: $issuer_url}' | jq --arg drogue_api_url "${DROGUE_API_URL}" '. + {drogue_api_url: $drogue_api_url}' | jq --arg ajour_api_url "${DROGUE_API_URL}" '. + {ajour_api_url: $ajour_api_url}'  > /endpoints/backend.json
+cat $BACKEND_JSON_FILE | jq --arg client_id "${CLIENT_ID}" '. + {client_id: $client_id}' | jq --arg issuer_url "${ISSUER_URL}" '. + {issuer_url: $issuer_url}' | jq --arg drogue_api_url "${DROGUE_API_URL}" '. + {drogue_api_url: $drogue_api_url}' | jq --arg ajour_api_url "${AJOUR_API_URL}" '. + {ajour_api_url: $ajour_api_url}'  > /endpoints/backend.json
 
 echo "Final backend information:"
 echo "---"
