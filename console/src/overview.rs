@@ -10,12 +10,16 @@ pub struct Overview {
     synced: usize,
     updating: usize,
     unknown: usize,
-    firmwares: usize,
     _bridge: SharedDataBridge<Data>,
+    _builds: SharedDataBridge<Vec<BuildInfo>>,
+    builds: usize,
+    builds_running: usize,
+    builds_failed: usize,
 }
 
 pub enum Msg {
     DataUpdated(Data),
+    BuildsUpdated(Vec<BuildInfo>),
 }
 
 impl Component for Overview {
@@ -29,19 +33,40 @@ impl Component for Overview {
             synced: 0,
             updating: 0,
             unknown: 0,
-            firmwares: 0,
+            builds: 0,
+            builds_running: 0,
+            builds_failed: 0,
             _bridge: SharedDataBridge::from(ctx.link(), Msg::DataUpdated),
+            _builds: SharedDataBridge::from(ctx.link(), Msg::BuildsUpdated),
         }
     }
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
+            Msg::BuildsUpdated(builds) => {
+                let mut total_builds = 0;
+                let mut builds_failed = 0;
+                let mut builds_running = 0;
+                for build in builds.iter() {
+                    if let Some(status) = &build.status {
+                        if status == "Running" {
+                            builds_running += 1;
+                        } else if status == "Failed" {
+                            builds_failed += 1;
+                        }
+                    }
+                    total_builds += 1;
+                }
+                self.builds = total_builds;
+                self.builds_failed = builds_failed;
+                self.builds_running = builds_running;
+                true
+            }
             Msg::DataUpdated(data) => {
                 let mut devices = 0;
                 let mut synced = 0;
                 let mut updating = 0;
                 let mut unknown = 0;
-                let mut firmwares = 0;
                 for app in data.iter() {
                     for device in app.1.iter() {
                         let model: DeviceModel = device.into();
@@ -50,24 +75,14 @@ impl Component for Overview {
                             DeviceState::Updating(_) => updating += 1,
                             DeviceState::Unknown => unknown += 1,
                         }
-                        if model.has_build {
-                            log::info!("Device {} has build", model.name);
-                            firmwares += 1;
-                        }
                     }
                     devices += app.1.len();
-                    let model: ApplicationModel = app.into();
-                    if model.has_build {
-                        log::info!("App {} has build", model.name);
-                        firmwares += 1;
-                    }
                 }
                 self.apps = data.len();
                 self.devices = devices;
                 self.synced = synced;
                 self.updating = updating;
                 self.unknown = unknown;
-                self.firmwares = firmwares;
                 true
             }
         }
@@ -86,11 +101,8 @@ impl Component for Overview {
             "Devices"
         };
 
-        let build_title = if self.firmwares == 1 {
-            "Build"
-        } else {
-            "Builds"
-        };
+        let build_title = if self.builds == 1 { "Build" } else { "Builds" };
+        let builds_idle = self.builds - self.builds_failed - self.builds_running;
         html! {
             <>
                 <PageSection variant={PageSectionVariant::Light} limit_width=true>
@@ -100,7 +112,7 @@ impl Component for Overview {
                 <Bullseye>
                 <Gauge id={"apps"} title={format!("{} {}", self.apps, app_title)} values={vec![(100 as f32, ChartColor::DarkBlue.code().to_string(), None)]} class={"large"}/>
                 <Gauge id={"devices"} title={format!("{} {}", self.devices, device_title)} values={vec![(self.synced as f32, ChartColor::DarkBlue.code().to_string(), Some("Synced".to_string())), (self.updating as f32, ChartColor::LightBlue.code().to_string(), Some("Updating".to_string())), (self.unknown as f32, ChartColor::DarkYellow.code().to_string(), Some("Unknown".to_string()))]} class={"large"}/>
-                <Gauge id={"firmwares"} title={format!("{} {}", self.firmwares, build_title)} values={vec![(100 as f32, ChartColor::DarkBlue.code().to_string(), None)]} class={"large"}/>
+                <Gauge id={"builds"} title={format!("{} {}", self.builds, build_title)} values={vec![(builds_idle as f32, ChartColor::DarkBlue.code().to_string(), Some("Idle".to_string())), (self.builds_running as f32, ChartColor::LightBlue.code().to_string(), Some("Running".to_string())), (self.builds_failed as f32, ChartColor::DarkYellow.code().to_string(), Some("Failed".to_string()))]} class={"large"} />
                 </Bullseye>
                 </PageSection>
             </>

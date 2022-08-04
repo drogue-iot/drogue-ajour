@@ -6,7 +6,6 @@ use actix_web::{
 use ajour_schema::BuildInfo;
 use ajour_schema::*;
 use anyhow::anyhow;
-use chrono::{offset::Utc, DateTime};
 use clap::Parser;
 use drogue_client::core::v1::Conditions;
 use drogue_client::{
@@ -20,7 +19,6 @@ use kube::{
 };
 use kube::{Client as KubeClient, ResourceExt};
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -42,9 +40,14 @@ struct Args {
     /// Port for health endpoint
     #[clap(long, default_value_t = 8080)]
     port: u16,
+
+    /// A comma-separated list of applications that can have builds triggered
+    #[clap(long)]
+    allowed_applications: Option<String>,
 }
 
 pub struct ApiConfig {
+    apps: HashSet<String>,
     namespace: String,
     pipeline: String,
     volume_size: String,
@@ -57,6 +60,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let namespace = args.namespace;
     let registry_url = reqwest::Url::parse(&args.device_registry).unwrap();
+    let apps: HashSet<String> = if let Some(apps) = args.allowed_applications {
+        apps.split(",").map(|s| s.to_string()).collect()
+    } else {
+        HashSet::new()
+    };
 
     const GROUP_TEKTON_DEV: &str = "tekton.dev";
     const KIND_PIPELINE_RUN: &str = "PipelineRun";
@@ -70,19 +78,20 @@ async fn main() -> Result<(), anyhow::Error> {
         Api::<DynamicObject>::namespaced_with(kube.clone(), &namespace, &pipeline_run_resource);
 
     let config = ApiConfig {
+        apps,
         service_account: "pipeline".to_string(),
         pipeline: "oci-firmware".to_string(),
         volume_size: "10Gi".to_string(),
         namespace,
     };
 
+    log::info!("API starting allowing {:?}", config.apps);
     let state = Arc::new(State::new(
         config,
         registry_url,
         pipeline_runs,
         pipeline_run_resource,
     ));
-    log::info!("API starting");
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
@@ -177,15 +186,19 @@ async fn trigger_build(
             image_pull_policy: _,
             build,
         } => {
-            if let Some(build) = build {
-                if let Err(e) = state.trigger(app, dev, &image, build).await {
-                    log::warn!("Error triggering build: {:?}", e);
-                    HttpResponse::InternalServerError()
+            if state.is_allowed(app) {
+                if let Some(build) = build {
+                    if let Err(e) = state.trigger(app, dev, &image, build).await {
+                        log::warn!("Error triggering build: {:?}", e);
+                        HttpResponse::InternalServerError()
+                    } else {
+                        HttpResponse::Ok()
+                    }
                 } else {
-                    HttpResponse::Ok()
+                    HttpResponse::NotFound()
                 }
             } else {
-                HttpResponse::NotFound()
+                HttpResponse::Forbidden()
             }
         }
         _ => {
@@ -367,6 +380,10 @@ impl State {
         );
         let dev = drogue.get_device(app, device).await?;
         Ok(dev)
+    }
+
+    fn is_allowed(&self, app: &str) -> bool {
+        self.config.apps.contains(app)
     }
 
     async fn trigger(
