@@ -10,7 +10,9 @@ REVISION=$(git rev-parse --short HEAD | tr -d '\n')
 SZ=$(du -b ${ARTIFACT} | cut -f1)
 CHECKSUM=$(sha256sum ${ARTIFACT} | awk '{ print $1 }')
 
-cp ${ARTIFACT} firmware.bin 
+if [ "${ARTIFACT}" != "firmware.bin" ]; then
+    cp ${ARTIFACT} firmware.bin 
+fi
 cat<<EOF > firmware.json
 {
   "version": "${REVISION}",
