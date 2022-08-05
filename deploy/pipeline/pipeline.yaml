@@ -27,7 +27,7 @@ spec:
       name: IMAGE
       type: string
     - default: ""
-      name: CARGO_BUILD_ARGS
+      name: BUILD_ARGS
       description: Additional arguments to pass to cargo
       type: string
   tasks:

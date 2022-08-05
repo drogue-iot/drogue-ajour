@@ -11,3 +11,5 @@ ENV CARGO_HOME "/usr/src/.cargo-container-home"
 
 RUN cargo install cargo-binutils
 RUN rustup component add llvm-tools-preview
+
+CMD ["/build.sh"]

@@ -9,26 +9,16 @@ spec:
       description: Path to cargo project to build
       type: string
     - default: ""
-      name: CARGO_BUILD_ARGS
+      name: BUILD_ARGS
       description: Additional arguments to pass to cargo
-      type: string
+      type: array
     - name: BUILDER_IMAGE
       description: Firmware builder image
       type: string
   steps:
-    - command:
-        - /bin/bash
-        - '-c'
-        - >-
-          cp Dockerfile $(workspaces.input.path)/$(params.PROJECT_PATH) &&
-          ./build.sh $(workspaces.input.path)/$(params.PROJECT_PATH) "$(params.CARGO_BUILD_ARGS)" &&
-          cd $(workspaces.input.path)/$(params.PROJECT_PATH) &&
-          git rev-parse --short HEAD | tr -d '\n' > $(results.revision.path)
+    - args: $(params.BUILD_ARGS)
       image: $(params.BUILDER_IMAGE)
       name: build
-  results:
-    - name: revision
-      description: Git revision
   workspaces:
     - description: Build directory
       mountPath: /workspace
