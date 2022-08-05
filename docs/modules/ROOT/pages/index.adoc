@@ -5,18 +5,17 @@ Drogue Ajour is a firmware update and build service for tiny devices conneted to
 It offers:
 
  * Delivery - delivering firmware updates to connected devices.
- * Build (source-to-firmware) - building firmware and storing it in a firmware repository.
- * External firmware storage - Distribute firmware stored in container registries, Eclipse Hawkbit or on disk.
+ ** Protocol support: any protocol supported by Drogue Cloud (HTTP, MQTT, CoAP, LoRaWAN)
+ * Build - building firmware and storing it in a firmware repository.
  * RESTful API for inspecting and triggering builds.
  * Management console to inspect rollout status and builds.
- * Protocol support: any protocol supported by Drogue Cloud (HTTP, MQTT, CoAP, LoRaWAN)
 
 It is built on top of:
 
- * _Drogue Cloud_ - For authentication and transport firmware updates to devices.
- * _Tekton_ - For defining a CI/CD pipeline for firmware builds and storing.
+ * link:https://drogue.io[_Drogue Cloud_] - For authentication and transport firmware updates to devices.
+ * link:https://tekton.dev[_Tekton_] - For defining a CI/CD pipeline for firmware builds and storing.
 
-You can run Drogue Ajour locally or on a Kubernetes cluster. With it, you can build a firmware delivery pipeline for your devices.
+You can run Drogue Ajour locally or on a link:https://kubernetes.io[Kubernetes] cluster. With it, you can build a firmware delivery pipeline for your devices.
 
 == Overview
 
