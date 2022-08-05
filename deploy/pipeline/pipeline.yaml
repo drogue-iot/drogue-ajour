@@ -13,7 +13,11 @@ spec:
       type: string
     - default: .
       name: PROJECT_PATH
-      description: Path to cargo project to build
+      description: Path to project to build
+      type: string
+    - default: firmware.bin
+      name: ARTIFACT_PATH
+      description: Path to resulting artifact from build
       type: string
     - default: image-registry.openshift-image-registry.svc:5000/drogue-ajour
       description: Registry for image
@@ -22,7 +26,10 @@ spec:
     - name: BUILDER_IMAGE
       description: Firmware builder image
       type: string
-      default: image-registry.openshift-image-registry.svc:5000/drogue-ajour/firmware-builder:latest
+    - name: BUNDLER_IMAGE 
+      description: Firmware bundler image
+      type: string
+      default: image-registry.openshift-image-registry.svc:5000/drogue-ajour/firmware-bundler:latest
     - description: Firmware image name
       name: IMAGE
       type: string
@@ -51,8 +58,8 @@ spec:
           value: $(params.PROJECT_PATH)
         - name: BUILDER_IMAGE
           value: $(params.BUILDER_IMAGE)
-        - name: CARGO_BUILD_ARGS
-          value: $(params.CARGO_BUILD_ARGS)
+        - name: BUILD_ARGS
+          value: $(params.BUILD_ARGS)
       runAfter:
         - fetch-repository
       taskRef:
@@ -61,11 +68,26 @@ spec:
       workspaces:
         - name: input
           workspace: build
+    - name: firmware-bundle
+      params:
+        - name: PROJECT_PATH
+          value: $(params.PROJECT_PATH)
+        - name: BUNDLER_IMAGE
+          value: $(params.BUNDLER_IMAGE)
+        - name: ARTIFACT_PATH
+          value: $(params.ARTIFACT_PATH)
+      runAfter:
+        - firmware-build
+      taskRef:
+        kind: Task
+        name: firmware-bundle
+      workspaces:
+        - name: input
+          workspace: build
     - name: firmware-publish
       params:
         - name: IMAGE
-          #value: $(params.REGISTRY)/$(params.IMAGE):$(tasks.firmware-build.results.revision)
-          value: $(params.REGISTRY)/$(params.IMAGE) #:$(params.GIT_REVISION)
+          value: $(params.REGISTRY)/$(params.IMAGE)
         - name: DOCKERFILE
           value: $(workspaces.source.path)/$(params.PROJECT_PATH)/Dockerfile
         - name: CONTEXT
@@ -73,7 +95,7 @@ spec:
         - name: BUILD_EXTRA_ARGS
           value: --label io.drogue.metadata="`cat $(workspaces.source.path)/$(params.PROJECT_PATH)/firmware.json`"
       runAfter:
-        - firmware-build
+        - firmware-bundle
       taskRef:
         kind: ClusterTask
         name: buildah

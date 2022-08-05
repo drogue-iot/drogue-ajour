@@ -1,20 +1,20 @@
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
-  name: firmware-builder
+  name: rust-firmware-builder
 spec:
   source:
     git:
       ref: main
       uri: 'https://github.com/drogue-iot/drogue-ajour.git'
     type: Git
-    contextDir: 'builder'
+    contextDir: 's2f/builder/rust'
   strategy:
     type: Docker
   output:
     to:
       kind: "ImageStreamTag"
-      name: "firmware-builder:latest"
+      name: "rust-firmware-builder:latest"
   triggers:
     - type: ImageChange
       imageChange: {}

@@ -1,0 +1,21 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: firmware-bundler
+spec:
+  source:
+    git:
+      ref: main
+      uri: 'https://github.com/drogue-iot/drogue-ajour.git'
+    type: Git
+    contextDir: 's2f/bundler'
+  strategy:
+    type: Docker
+  output:
+    to:
+      kind: "ImageStreamTag"
+      name: "firmware-bundler:latest"
+  triggers:
+    - type: ImageChange
+      imageChange: {}
+    - type: ConfigChange
