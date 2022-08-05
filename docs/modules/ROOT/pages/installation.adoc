@@ -1,6 +1,8 @@
 = Installation
 
-You can install Drogue Ajour either by compiling and running the components yourself, running the provided container images in your favorite container runtime, or deploy it all to Kubernetes. This guide will cover installation on a Kubernetes cluster using a container registry as the source for firmware.
+If you are using an existing installation of Drogue Cloud, such as the link:https://sandbox.drogue.cloud[Drogue Cloud Sandbox], it might already have Drogue Ajour enabled.
+
+If not, you can install Drogue Ajour either by compiling and running the components yourself, running the provided container images in your favorite container runtime, or deploy it all to Kubernetes. This guide will cover installation on a Kubernetes cluster using a container registry as the source for firmware.
 
 == Prerequisites
 
