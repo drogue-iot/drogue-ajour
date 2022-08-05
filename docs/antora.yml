@@ -3,3 +3,4 @@ title: Drogue Ajour
 version: dev
 nav:
   - modules/ROOT/nav.adoc
+  - modules/api/nav.adoc
