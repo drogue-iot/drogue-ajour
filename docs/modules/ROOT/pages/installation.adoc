@@ -1,0 +1,66 @@
+= Installation
+
+You can install Drogue Ajour either by compiling and running the components yourself, running the provided container images in your favorite container runtime, or deploy it all to Kubernetes. This guide will cover installation on a Kubernetes cluster using a container registry as the source for firmware.
+
+== Prerequisites
+
+* link:https://kubernetes.io[Kubernetes]
+* link:https://drogue.io[Drogue Cloud]
+* link:https://github.com/drogue-iot/drg[drg]
+* (Optional) Container Registry - For storing firmware in container images.
+* (Optional) link:https://tekton.dev[Tekton] - For the firmware build pipeline.
+
+For storing firmware, you can use either an external Eclipse Hawkbit instance or a Container Registry, this guide will assume a container registry being used.
+
+== Download install files
+
+The installation manifests can be found on the link:https://github.com/drogue-iot/drogue-ajour/releases[GitHub releases] page, or by cloning the git repository.
+
+Extract the zip file and enter the extracted folder before proceeding with the installation commands.
+
+== Firmware delivery
+
+To install the firmware delivery components, you need to create an access token for the server. You can do this from the drogue console or using the link:https://github.com/drogue-iot/drg[`drg`] command line tool
+
+----
+# Note down the access token generated
+drg create token
+
+# You can get these values from your Drogue Cloud console
+kubectl create secret generic drogue-config --from-literal=token=<access token> --from-literal=user=<drogue cloud user> --from-literal=registry-url=<drogue API url> --from-literal=mqtt-integration=<drogue MQTT integration URL>
+
+# These values depend on if you're using a builtin container registry or an external one. Using docker.io as example
+kubectl create secret generic container-registry --from-literal=prefix=quay.io/myorg/ --from-literal=token=<registry access token>
+
+# Deploy the server
+kubectl apply -f deploy/server
+----
+
+== Firmware build
+
+To install the firmware build components:
+
+----
+# Deploy the API
+kubectl apply -f deploy/api
+
+# Deploy Tekton pipelines - This might contain references to Tasks that are not available out of the box
+kubectl apply -f deploy/pipeline
+----
+
+
+This will also create an externally accessible ingress for the API. You can create your own ingress or edit it in order to change hostname and settings.
+
+== Console
+
+For this step, you must note down the hostname generated/set for your API ingress above. To deploy the console, we also need a few additional settings in order to enable OIDC authentication. The fields to add are:
+
+* `issuer-url` - the URL of the same OIDC service used by Drogue Cloud.
+* `client-id` - OIDC client id, usually `drogue`.
+* `ajour-api-url` - The URL to the external API ingress created earlier.
+
+To deploy the console:
+
+----
+kubectl apply -f deploy/console
+----

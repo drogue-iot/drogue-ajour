@@ -1,0 +1,5 @@
+name: drogue-ajour
+title: Drogue Ajour
+version: dev
+nav:
+  - modules/ROOT/nav.adoc

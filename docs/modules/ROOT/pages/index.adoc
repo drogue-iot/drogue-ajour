@@ -1,0 +1,19 @@
+= Drogue Ajour
+
+Drogue Ajour takes care of firmware updates for you devices connected to Drogue IoT Cloud.
+
+It offers:
+
+ * Firmware delivery - delivering firmware updates to connected devices.
+ * Firmware build - building firmware and store it in a firmware store.
+ * Flexible firmware storage - Distribute firmware stored in OCI registries, Eclipse Hawkbit or on disk.
+ * RESTful API for inspecting and triggering builds.
+ * Management console to inspect rollout status and builds.
+ * Protocol support: any protocol supported by Drogue Cloud (HTTP, MQTT, CoAP, LoRaWAN)
+
+It is built on top of:
+
+ * _Drogue Cloud_ - For authentication and transport firmware updates to devices.
+ * _Tekton_ - For defining a CI/CD pipeline for firmware builds and storing.
+
+You can run Drogue Ajour locally or on a Kubernetes cluster.

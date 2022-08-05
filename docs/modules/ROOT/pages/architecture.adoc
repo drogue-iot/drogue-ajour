@@ -1,0 +1,20 @@
+= Architecture
+
+Drogue Ajour is composed of 2 main components serving different functions:
+
+* _Firmware Delivery_ - Transporting firmware updates to devices.
+* _Firmware Build_ - Building and storing firmware artifacts.
+
+Of these, only the firmware delivery component is mandatory. However, deploying both of these components provide you with an end to end Continuous Delivery (CD) pipeline for your devices.
+
+image::ajour_architecture.png[Drogue Ajour Architecture]
+
+== Firmware delivery
+
+Firmware delivery is the main functionality of Drogue Ajour. This involves transporting the firmware to devices using a CBOR-based protocol. The transport protocol is designed for minimal overhead, and to allow devices to consume updates at their own pace.
+
+The firmware itself can be fetched from disk, Eclipse Hawkbit or a Docker/Container registry.
+
+== Firmware build
+
+This is an optional component that allow you to build your firmware and make it available to the delivery component for rolling out to your devices.
