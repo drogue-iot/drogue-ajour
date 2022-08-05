@@ -1,4 +1,5 @@
 use crate::data::SharedDataBridge;
+use crate::error::error;
 use crate::toast::success;
 use crate::types::BuildModel;
 use crate::BackendConfig;
@@ -70,21 +71,41 @@ impl Component for BuildOverview {
 
                                 let client = reqwest::Client::new();
                                 let token = token.clone();
+                                let app = build.app.clone();
+                                let device = build.device.clone();
                                 wasm_bindgen_futures::spawn_local(async move {
                                     match client.post(url).bearer_auth(token).send().await {
                                         Ok(result) => {
                                             if result.status().is_success() {
                                                 log::debug!("Triggered!");
+                                                if let Some(dev) = &device {
+                                                    success(format!(
+                                                        "Build {}/{} triggered",
+                                                        &app, &dev
+                                                    ));
+                                                } else {
+                                                    success(format!("Build {} triggered", &app));
+                                                }
                                             }
                                         }
                                         Err(e) => {
                                             log::warn!("Error triggering builds: {:?}", e);
+                                            if let Some(dev) = &device {
+                                                error(
+                                                    "Failed",
+                                                    format!("Build {}/{} triggered", &app, &dev),
+                                                );
+                                            } else {
+                                                error(
+                                                    "Failed",
+                                                    format!("Build {} triggered", &app),
+                                                );
+                                            }
                                         }
                                     }
                                 });
                             }
                         }
-                        success("Builds triggered");
                     } else {
                         log::debug!("Not access token acquired, not triggering build");
                     }

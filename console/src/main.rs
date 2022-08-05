@@ -21,6 +21,7 @@ mod bindings;
 mod builds;
 mod data;
 mod devices;
+mod error;
 mod fetcher;
 mod overview;
 mod progress;
