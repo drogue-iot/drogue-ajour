@@ -417,7 +417,7 @@ impl State {
             log::info!("Deleted previous pipeline run {}", name);
         }
 
-        let mut params = vec![
+        let params = vec![
             FirmwareBuildEnv {
                 name: "GIT_REPO".to_string(),
                 value: BuildEnvArgValue::String(git_repo),
@@ -436,16 +436,13 @@ impl State {
             },
             FirmwareBuildEnv {
                 name: "BUILDER_IMAGE".to_string(),
-                value: BuildEnvArgValue::String(image.to_string()),
+                value: BuildEnvArgValue::String(spec.image.to_string()),
+            },
+            FirmwareBuildEnv {
+                name: "BUILD_ARGS".to_string(),
+                value: BuildEnvArgValue::Array(spec.args.unwrap_or(Vec::new())),
             },
         ];
-
-        if let Some(args) = spec.args {
-            params.push(FirmwareBuildEnv {
-                name: "BUILD_ARGS".to_string(),
-                value: BuildEnvArgValue::Array(args),
-            });
-        }
 
         run.data["spec"] = json!({
             "params": params,
@@ -472,6 +469,8 @@ impl State {
                 }
             ]
         });
+
+        log::trace!("Creating Pipeline run with spec: {}", run.data["spec"]);
 
         self.kube.create(&Default::default(), &run).await?;
         Ok(())

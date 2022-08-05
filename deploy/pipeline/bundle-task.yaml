@@ -21,7 +21,7 @@ spec:
         - '-c'
         - >-
           cp Dockerfile $(workspaces.input.path)/$(params.PROJECT_PATH) &&
-          ./bundle.sh $(workspaces.input.path)/$(params.PROJECT_PATH) $(params.ARTIFACT_PATH) &&
+          ./bundle.sh $(workspaces.input.path)/$(params.PROJECT_PATH) $(params.ARTIFACT_PATH)
       image: $(params.BUNDLER_IMAGE)
       name: bundler
   workspaces:

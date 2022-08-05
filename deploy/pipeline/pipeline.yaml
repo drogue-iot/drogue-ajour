@@ -33,10 +33,9 @@ spec:
     - description: Firmware image name
       name: IMAGE
       type: string
-    - default: ""
-      name: BUILD_ARGS
+    - name: BUILD_ARGS
+      type: array
       description: Additional arguments to pass to cargo
-      type: string
   tasks:
     - name: fetch-repository
       params:
@@ -59,7 +58,7 @@ spec:
         - name: BUILDER_IMAGE
           value: $(params.BUILDER_IMAGE)
         - name: BUILD_ARGS
-          value: $(params.BUILD_ARGS)
+          value: ["$(params.BUILD_ARGS[*])"]
       runAfter:
         - fetch-repository
       taskRef:

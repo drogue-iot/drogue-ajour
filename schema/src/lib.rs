@@ -44,6 +44,8 @@ pub struct FirmwareBuildSpec {
     /// Build command line arguments
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<Vec<String>>,
+    /// Firmware artifact
+    pub artifact: FirmwareBuildArtifact,
     /// Build timeout
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<String>,
@@ -75,6 +77,7 @@ pub enum FirmwareBuildSource {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FirmwareBuildArtifact {
+    /// Path to firmware artifact relative to project directory
     pub path: String,
 }
 
