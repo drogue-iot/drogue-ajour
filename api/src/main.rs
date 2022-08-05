@@ -442,6 +442,10 @@ impl State {
                 name: "BUILD_ARGS".to_string(),
                 value: BuildEnvArgValue::Array(spec.args.unwrap_or(Vec::new())),
             },
+            FirmwareBuildEnv {
+                name: "ARTIFACT_PATH".to_string(),
+                value: BuildEnvArgValue::String(spec.artifact.path.to_string()),
+            },
         ];
 
         run.data["spec"] = json!({
