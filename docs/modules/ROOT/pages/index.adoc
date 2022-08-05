@@ -5,7 +5,7 @@ Drogue Ajour takes care of firmware updates for you devices connected to Drogue 
 It offers:
 
  * Firmware delivery - delivering firmware updates to connected devices.
- * Firmware build - building firmware and store it in a firmware store.
+ * Firmware build (source-to-firmware) - building firmware and store it in a firmware store.
  * Flexible firmware storage - Distribute firmware stored in OCI registries, Eclipse Hawkbit or on disk.
  * RESTful API for inspecting and triggering builds.
  * Management console to inspect rollout status and builds.

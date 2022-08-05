@@ -15,6 +15,27 @@ Firmware delivery is the main functionality of Drogue Ajour. This involves trans
 
 The firmware itself can be fetched from disk, Eclipse Hawkbit or a Docker/Container registry.
 
+=== Container format
+
+When using a container registry, the container image must contain the following two files in the root of the image:
+
+* `firmware.bin` - This is the firmware artifact to be delivered
+* `firmware.json` - This is a manifest with metadata of the firmware
+
+An example `firmware.json` manifest looks like this:
+
+----
+{
+  "version": "2dbedf0",
+  "size": 7716,
+  "checksum": "2e8db6036411adccba75dd5a0316e6ab72402351478a35ac5a452d4cf6371c8f"
+}
+----
+
+As long as these two files are present, Drogue Ajour will be able to deliver the firmware to devices.
+
 == Firmware build
 
-This is an optional component that allow you to build your firmware and make it available to the delivery component for rolling out to your devices.
+This is an optional component that allow you to build your firmware from source and make it available to the delivery component for rolling out to your devices.
+
+Drogue Ajour provides Tekton pipeline definitions that can build container images in the expected format and push them to container registries.
