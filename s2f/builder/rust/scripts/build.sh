@@ -7,4 +7,4 @@ echo "Building firmware"
 REVISION=${REVISION} cargo build --release ${BUILD_ARGS}
 
 echo "Creating binary file"
-REVISION=${REVISION} cargo objcopy --release ${BUILD_ARGS} -- -O binary artifact.bin
+REVISION=${REVISION} cargo objcopy --release ${BUILD_ARGS} -- -O binary firmware.bin
