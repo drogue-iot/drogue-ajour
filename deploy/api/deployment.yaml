@@ -29,7 +29,7 @@ spec:
             valueFrom:
               secretKeyRef:
                 name: drogue-config
-                key: api-url
+                key: registry-url
         ports:
         - name: endpoint
           containerPort: 8080

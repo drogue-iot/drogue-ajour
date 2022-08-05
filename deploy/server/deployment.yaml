@@ -61,22 +61,7 @@ spec:
           - name: MQTT_GROUP_ID
             value: firmware
           - name: HAWKBIT_ENABLE
-            value: "true"
-          - name: HAWKBIT_URL
-            valueFrom:
-              secretKeyRef:
-                key: url
-                name: hawkbit-config
-          - name: HAWKBIT_GATEWAY_TOKEN
-            valueFrom:
-              secretKeyRef:
-                key: gateway-token
-                name: hawkbit-config
-          - name: HAWKBIT_TENANT
-            valueFrom:
-              secretKeyRef:
-                key: tenant
-                name: hawkbit-config
+            value: "false"
         ports:
         - containerPort: 8080
         livenessProbe:
