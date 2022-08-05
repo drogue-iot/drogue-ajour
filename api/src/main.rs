@@ -420,33 +420,30 @@ impl State {
         let mut params = vec![
             FirmwareBuildEnv {
                 name: "GIT_REPO".to_string(),
-                value: git_repo,
+                value: BuildEnvArgValue::String(git_repo),
             },
             FirmwareBuildEnv {
                 name: "GIT_REVISION".to_string(),
-                value: git_rev,
+                value: BuildEnvArgValue::String(git_rev),
             },
             FirmwareBuildEnv {
                 name: "PROJECT_PATH".to_string(),
-                value: project_path,
+                value: BuildEnvArgValue::String(project_path),
             },
             FirmwareBuildEnv {
                 name: "IMAGE".to_string(),
-                value: image.to_string(),
+                value: BuildEnvArgValue::String(image.to_string()),
+            },
+            FirmwareBuildEnv {
+                name: "BUILDER_IMAGE".to_string(),
+                value: BuildEnvArgValue::String(image.to_string()),
             },
         ];
 
         if let Some(args) = spec.args {
             params.push(FirmwareBuildEnv {
-                name: "CARGO_BUILD_ARGS".to_string(),
-                value: args.join(" "),
-            });
-        }
-
-        if let Some(image) = spec.image {
-            params.push(FirmwareBuildEnv {
-                name: "BUILDER_IMAGE".to_string(),
-                value: image.to_string(),
+                name: "BUILD_ARGS".to_string(),
+                value: BuildEnvArgValue::Array(args),
             });
         }
 

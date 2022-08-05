@@ -37,8 +37,7 @@ pub struct FirmwareBuildSpec {
     /// Build source
     pub source: FirmwareBuildSource,
     /// Builder image
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub image: Option<String>,
+    pub image: String,
     /// Pipeline environment variables
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env: Option<Vec<FirmwareBuildEnv>>,
@@ -53,7 +52,15 @@ pub struct FirmwareBuildSpec {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct FirmwareBuildEnv {
     pub name: String,
-    pub value: String,
+    pub value: BuildEnvArgValue,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum BuildEnvArgValue {
+    #[serde(rename = "git")]
+    String(String),
+    Array(Vec<String>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -95,9 +102,21 @@ pub struct BuildInfo {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+    fn args_serde() {
+        let args = vec![
+            FirmwareBuildEnv {
+                name: "key1".to_string(),
+                value: BuildEnvArgValue::String("mystring".to_string()),
+            },
+            FirmwareBuildEnv {
+                name: "key2".to_string(),
+                value: BuildEnvArgValue::Array(vec!["elem1".to_string(), "elem2".to_string()]),
+            },
+        ];
+        let output = serde_json::to_string(&args).unwrap();
+        assert_eq!("[{\"name\":\"key1\",\"value\":\"mystring\"},{\"name\":\"key2\",\"value\":[\"elem1\",\"elem2\"]}]", output);
     }
 }

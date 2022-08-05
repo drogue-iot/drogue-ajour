@@ -26,7 +26,7 @@ js-sys = "0.3"
 gloo = "0.4"
 url = "2"
 http = "0.2"
-ajour-schema = { path = "../schema" }
+ajour-schema = { path = "../schema", default-features = false }
 
 [patch.crates-io]
 #patternfly-yew = { git = "https://github.com/ctron/patternfly-yew", rev = "ad0b2730402c004cd6e10ec6c52a2a0da2e13310" }

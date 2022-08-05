@@ -8,15 +8,15 @@ spec:
       name: PROJECT_PATH
       description: Path to the project directory
       type: string
-    - default: ""
-      name: BUILD_ARGS
+    - name: BUILD_ARGS
+      default: []
       description: Additional arguments to pass to cargo
       type: array
     - name: BUILDER_IMAGE
       description: Firmware builder image
       type: string
   steps:
-    - args: $(params.BUILD_ARGS)
+    - args: ["$(params.BUILD_ARGS[*])"]
       image: $(params.BUILDER_IMAGE)
       workingDir: $(workspaces.input.path)/$(params.PROJECT_PATH)
       name: build
