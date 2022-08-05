@@ -1,4 +1,4 @@
-* xref:installation.adoc[Installation]
 * xref:using.adoc[User Guide]
+* xref:installation.adoc[Admin Guide]
 * xref:protocol.adoc[Update Protocol]
 * xref:image-format.adoc[Image Format]
