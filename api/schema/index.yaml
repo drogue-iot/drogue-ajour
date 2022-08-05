@@ -1,0 +1,94 @@
+openapi: "3.0.0"
+info:
+  title: Drogue Ajour API
+  version: "0.1"
+  contact:
+    url: https://drogue.io
+  description: |
+    This describes the Drogue Ajour build management API. It is intended to be used to manage and configure firmware builds.
+
+servers:
+  - url: "http://localhost:8080"
+
+externalDocs:
+  description: Drogue IoT Documentation
+  url: https://book.drogue.io
+
+security:
+  - api_key: [ ]
+
+tags:
+  - name: Build
+    description: Read firmware builds with Drogue Ajour
+  - name: Trigger
+    description: Trigger firmware builds with Drogue Ajour
+
+paths:
+  /api/build/v1alpha1:
+    get:
+      tags:
+        - Build
+      description: Return all the builds the user has access to
+      responses:
+        200:
+          description: A list of builds.
+          content:
+            'application/json':
+              schema:
+                $ref: '#/components/schemas/BuildInfo'
+        401:
+          description: Unauthorized.
+  /api/build/v1alpha1/apps/{application}/trigger:
+    post:
+      tags:
+        - Trigger
+      description: Trigger firmware build using the build specification in a specific application.
+      responses:
+        200:
+          description: Build triggered successfully
+        404:
+          description: If the requested application does not exist or if the user has no access to it.
+        401:
+          description: If the user does not have access to trigger builds.
+
+  /api/build/v1alpha1/apps/{application}/devices/{device}/trigger:
+    post:
+      tags:
+        - Trigger
+      description: Trigger firmware build using the build specification in a specific device.
+      responses:
+        200:
+          description: Build triggered successfully
+        404:
+          description: If the requested application does not exist or if the user has no access to it.
+        401:
+          description: If the user does not have access to trigger builds.
+
+components:
+  schemas:
+    BuildInfo:
+      type: object
+      additionalProperties: false
+      required:
+        - app
+      properties:
+        app:
+          type: string
+          description: |
+            The application owning this build. 
+        device:
+          type: string
+          description: |
+            The device owning this build
+        started:
+          type: string
+          description: |
+            The start time of this build
+        completed:
+          type: string
+          description: |
+            The completion time of this build
+        status:
+          type: string
+          description: |
+            The last known status of this build
