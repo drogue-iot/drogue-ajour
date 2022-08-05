@@ -1,0 +1,17 @@
+= Container image format
+
+When using a container registry, the container image must contain the following two files in the root of the image:
+
+* `firmware.bin` - This is the firmware artifact to be delivered
+* `firmware.json` - This is a manifest with metadata of the firmware
+
+An example `firmware.json` manifest looks like this:
+
+----
+{
+  "version": "2dbedf0",
+  "size": 7716,
+  "checksum": "2e8db6036411adccba75dd5a0316e6ab72402351478a35ac5a452d4cf6371c8f"
+}
+----
+As long as these two files are present, Drogue Ajour will be able to deliver the firmware to devices.

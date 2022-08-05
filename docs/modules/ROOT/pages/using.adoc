@@ -1,4 +1,4 @@
-= Using
+= User Guide
 
 Drogue Ajour makes use of the `Application` and `Device` types from Drogue Cloud.
 
@@ -28,7 +28,7 @@ spec:
             image: my-firmware:latest
 ----
 
-NOTE: Firmware images can only be retrieved from the container registry Drogue Ajour was configured for, and the image reference is therefore relative to the configured registry. See xref:architecture.adoc[expected container format] for what the image must look like.
+NOTE: Firmware images can only be retrieved from the container registry Drogue Ajour was configured for, and the image reference is therefore relative to the configured registry. See xref:index.adoc[expected container format] for what the image must look like.
 
 Save the new definition. When the device connects to the update service, the update service will make sure the device is updated from the firmware contained within the container image.
 
