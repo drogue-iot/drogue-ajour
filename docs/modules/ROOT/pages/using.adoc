@@ -1,6 +1,8 @@
 = User Guide
 
-Drogue Ajour makes use of the `Application` and `Device` types from Drogue Cloud.
+If you are using an existing installation of Drogue Cloud, such as the link:https://sandbox.drogue.cloud[Drogue Cloud Sandbox], it might already have Drogue Ajour enabled.
+
+If not, have a look at the xref:installation[Admin Guide].
 
 == Prerequisites
 * link:https://github.com/drogue-iot/drg[drg]
@@ -8,6 +10,8 @@ Drogue Ajour makes use of the `Application` and `Device` types from Drogue Cloud
 The following examples require that your a logged in to your Drogue Cloud cluster with `drg`.
 
 == Enabling firmware delivery
+
+Drogue Ajour makes use of the `Application` and `Device` types from Drogue Cloud.
 
 To enable firmware delivery for a given application or device, you must modify the `spec` section of the resource. You can have firmware delivered from a container registry, Eclipse Hawkbit or a file locally available to the Drogue Ajour server.
 
