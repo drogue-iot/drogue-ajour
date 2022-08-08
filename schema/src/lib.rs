@@ -18,7 +18,7 @@ dialect!(FirmwareSpec [Section::Spec => "firmware"]);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum FirmwareSpec {
-    #[serde(rename = "oci")]
+    #[serde(rename = "container")]
     OCI {
         image: String,
         #[serde(rename = "imagePullPolicy", default = "Default::default")]

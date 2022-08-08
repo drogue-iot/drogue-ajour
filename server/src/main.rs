@@ -123,7 +123,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let oci_client = if args.oci_registry_enable {
-        log::info!("Enabling OCI registry");
+        log::info!("Enabling Container Registry");
         Some(oci::OciClient::new(
             oci::ClientConfig {
                 protocol: if args.oci_registry_tls {

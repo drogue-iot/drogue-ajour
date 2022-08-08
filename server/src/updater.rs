@@ -56,7 +56,7 @@ impl Updater {
                         .await
                     } else {
                         let e = format!(
-                            "Device {}/{} requested OCI firwmare, but no OCI registry configured",
+                            "Device {}/{} requested container firwmare, but no container registry configured",
                             application, device
                         );
                         log::warn!("{}", e);

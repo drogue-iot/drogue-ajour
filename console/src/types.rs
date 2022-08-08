@@ -31,7 +31,7 @@ impl From<&Device> for DeviceModel {
                     image: _,
                     image_pull_policy: _,
                     build,
-                } => ("OCI".to_string(), build.is_some()),
+                } => ("Container".to_string(), build.is_some()),
                 FirmwareSpec::HAWKBIT { .. } => ("Hawkbit".to_string(), false),
                 FirmwareSpec::FILE { .. } => ("File".to_string(), false),
             }
@@ -217,7 +217,7 @@ impl From<&(Application, Vec<Device>)> for ApplicationModel {
                     image: _,
                     image_pull_policy: _,
                     build,
-                } => ("OCI".to_string(), build.is_some()),
+                } => ("Container".to_string(), build.is_some()),
                 FirmwareSpec::HAWKBIT { .. } => ("Hawkbit".to_string(), false),
                 FirmwareSpec::FILE { .. } => ("File".to_string(), false),
             }

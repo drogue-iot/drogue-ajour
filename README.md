@@ -37,17 +37,17 @@ Drogue Ajour uses the Drogue IoT Cloud event stream and command API to communica
 ```
 spec:
   firmware:
-    oci:
+    container:
       image: 'image-within-repo:1234'
 ```
 
 
 If defined at the `Application` it will apply to all devices unless there is a per device property, in which case that will override the application level property.
 
-As a reference architecture, Drogue Ajour uses an Open Container Initiative (OCI) registry to store container images with the device firmware. This allows reusing existing infrastructure commonly used in Kubernetes. However, Drogue Ajour also integrates with Eclipse Hawkbit for storing the firmware (see below).
+As a reference architecture, Drogue Ajour uses a Open Container Initiative (OCI) compatible registry to store container images with the device firmware. This allows reusing existing infrastructure commonly used in Kubernetes. However, Drogue Ajour also integrates with Eclipse Hawkbit for storing the firmware (see below).
 
-Building and deploying firmware is decoupled from the Drogue Ajour, as long as the expected manifest format can be retrieved from a firmware metadata (in case of OCI, as a label on the container image). As a reference architecture,
-a [tekton](tekton.dev) pipeline is used to show how you can build and deploy firmware to an OCI registry.
+Building and deploying firmware is decoupled from the Drogue Ajour, as long as the expected manifest format can be retrieved from a firmware metadata (in case of containers, as a label on the container image). As a reference architecture,
+a [tekton](tekton.dev) pipeline is used to show how you can build and deploy firmware to a container registry.
 
 The Drogue IoT Application and Device objects contain custom properties that define the desired firmware version that each device (or all) should be served.
 ```
@@ -69,7 +69,7 @@ The Drogue IoT Application and Device objects contain custom properties that def
 
 ### Hawkbit integration
 
-To use the Hawkbit integration instead of OCI, the schema is extended as follows:
+To use the Hawkbit integration instead of containers, the schema is extended as follows:
 
 ```
 spec:
