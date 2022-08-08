@@ -4,7 +4,11 @@ Drogue Ajour uses a custom application level protocol sent on a special 'dfu' ch
 
 The protocol is designed so that devices do not have to be online continuously during the update, but can receive firmware at their own pace.
 
-The protocol uses Consise Binary Object Representation (CBOR), to ensure a small message size that works well with embedded devices. For descriptive purposes, the examples here are provided in JSON.
+The protocol uses Consise Binary Object Representation (CBOR), to ensure a small message size that works well with embedded devices.
+
+image::update_protocol.png[Update protocol]
+
+The above sequence diagram corresponds to the example messages below. For descriptive purposes, the examples here are provided in JSON.
 
 A typical firmware update cycle runs as follows:
 
