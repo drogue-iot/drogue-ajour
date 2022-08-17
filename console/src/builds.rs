@@ -40,9 +40,15 @@ impl Component for BuildOverview {
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::DataUpdated(builds) => {
+            Msg::DataUpdated(mut builds) => {
+                builds.sort_by(|a, b| {
+                    let a = (&a.app, &a.device);
+                    let b = (&b.app, &b.device);
+                    a.partial_cmp(&b).unwrap()
+                });
+                let refresh = self.builds != builds;
                 self.builds = builds;
-                true
+                refresh
             }
             Msg::TriggerBuilds => {
                 if let Some(auth) = ctx.link().context::<OAuth2Context>(Callback::noop()) {
@@ -140,7 +146,7 @@ impl Component for BuildOverview {
         };
 
         let trigger_builds = ctx.link().callback(|_| Msg::TriggerBuilds);
-        let mut models: Vec<BuildModel> = self
+        let models: Vec<BuildModel> = self
             .builds
             .iter()
             .map(|build| {
@@ -154,11 +160,7 @@ impl Component for BuildOverview {
                 model
             })
             .collect();
-        models.sort_by(|a, b| {
-            let a = (&a.app, &a.device);
-            let b = (&b.app, &b.device);
-            a.partial_cmp(&b).unwrap()
-        });
+
         let model: SharedTableModel<BuildModel> = models.into();
 
         html! {
