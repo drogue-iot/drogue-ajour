@@ -88,7 +88,7 @@ impl HawkbitClient {
         &self,
         controller: &str,
         deployment: &Deployment,
-        success: bool,
+        status: serde_json::Value,
     ) -> Result<(), anyhow::Error> {
         let client = reqwest::Client::new();
         let url = format!(
@@ -99,14 +99,7 @@ impl HawkbitClient {
         let feedback = json! {
             {
                 "id": deployment.id,
-                "status": {
-                    "result": {
-                        "finished": if success { "success" } else { "failed" },
-                    },
-                    "execution": "closed",
-                    "details": ["Update was successfully installed."],
-                }
-
+                "status": status,
             }
         };
 
@@ -221,6 +214,30 @@ impl FirmwareStore for HawkbitClient {
         }
     }
 
+    async fn update_progress(
+        &mut self,
+        params: &Self::Params,
+        context: &Self::Context,
+        offset: u32,
+        size: u32,
+    ) -> Result<(), anyhow::Error> {
+        if let PollResult::Deployment(d) = context {
+            let status = json!({
+                "result": {
+                    "progress": {
+                        "of": size,
+                        "cnt": offset,
+                    },
+                    "finished": "none",
+                },
+                "execution": "proceeding",
+                "details": ["Updating..."],
+            });
+            self.provide_feedback(params, d, status).await?;
+        }
+        Ok(())
+    }
+
     async fn mark_synced(
         &mut self,
         params: &Self::Params,
@@ -228,7 +245,14 @@ impl FirmwareStore for HawkbitClient {
         success: bool,
     ) -> Result<(), anyhow::Error> {
         if let PollResult::Deployment(d) = context {
-            self.provide_feedback(params, d, success).await?;
+            let status = json!({
+                "result": {
+                    "finished": if success { "success" } else { "failed" },
+                },
+                "execution": "closed",
+                "details": ["Update was successfully installed."],
+            });
+            self.provide_feedback(params, d, status).await?;
         }
         Ok(())
     }

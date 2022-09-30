@@ -46,6 +46,16 @@ impl FirmwareStore for FileClient {
         Ok(((), Some(f.try_into()?)))
     }
 
+    async fn update_progress(
+        &mut self,
+        _: &Self::Params,
+        _: &Self::Context,
+        _: u32,
+        _: u32,
+    ) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+
     async fn mark_synced(
         &mut self,
         _: &Self::Params,
