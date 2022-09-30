@@ -151,6 +151,16 @@ impl FirmwareStore for OciClient {
         Ok(((), m))
     }
 
+    async fn update_progress(
+        &mut self,
+        _: &Self::Params,
+        _: &Self::Context,
+        _: u32,
+        _: u32,
+    ) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+
     type Context = ();
     async fn fetch_firmware(
         &mut self,

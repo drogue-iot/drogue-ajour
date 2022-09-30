@@ -150,6 +150,10 @@ impl Updater {
                         );
                     }
 
+                    let _ = store
+                        .update_progress(params, &ctx, offset as u32, metadata.size)
+                        .await;
+
                     if offset < metadata.size as usize {
                         let firmware = store.fetch_firmware(params, &ctx, &metadata).await?;
 
@@ -234,6 +238,14 @@ pub trait FirmwareStore {
     fn get_backoff(&self, _: &Self::Context) -> Option<u32> {
         None
     }
+
+    async fn update_progress(
+        &mut self,
+        params: &Self::Params,
+        context: &Self::Context,
+        offset: u32,
+        size: u32,
+    ) -> Result<(), anyhow::Error>;
 
     async fn mark_synced(
         &mut self,
