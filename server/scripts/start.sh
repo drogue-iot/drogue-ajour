@@ -42,4 +42,4 @@ if [ "${HAWKBIT_GATEWAY_TOKEN}" != "" ]; then
 fi
 
 
-/drogue-ajour ${ARGS}
+/drogue-ajour-update-server ${ARGS}

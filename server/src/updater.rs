@@ -173,10 +173,11 @@ impl Updater {
                         )
                         .try_into()?)
                     } else {
-                        let data = hex::decode(&metadata.checksum).map_err(|e| {
-                            log::warn!("Error decoding hex: {:?}", e);
-                            e
-                        })?;
+                        let data = hex::decode(&metadata.checksum.trim_start_matches("sha256:"))
+                            .map_err(|e| {
+                                log::warn!("Error decoding hex: {:?}", e);
+                                e
+                            })?;
                         log::info!("Sending swap instruction back to device!");
                         Ok(
                             Command::new_swap(&metadata.version, &data, status.correlation_id)

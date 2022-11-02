@@ -1,6 +1,6 @@
 [package]
-name = "drogue-ajour"
-version = "0.1.0"
+name = "drogue-ajour-update-server"
+version = "0.2.0"
 edition = "2021"
 description = "A firmware management service"
 
@@ -14,7 +14,7 @@ paho-mqtt = { version = "0.10", features = ["ssl"] }
 serde_cbor = "0.11"
 serde_json = "1"
 hex = "0.4"
-oci-distribution = "0.8"
+oci-distribution = "0.9"
 anyhow = "1"
 log = "0.4"
 env_logger = "0.9"

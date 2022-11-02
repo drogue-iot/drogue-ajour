@@ -1,33 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: server
+  name: update-server
   labels:
     app.kubernetes.io/name: drogue-ajour
     app.kubernetes.io/instance: ajour
-    app.kubernetes.io/component: server
+    app.kubernetes.io/component: update-server
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: drogue-ajour
       app.kubernetes.io/instance: ajour
-      app.kubernetes.io/component: server
+      app.kubernetes.io/component: update-server
   template:
     metadata:
       labels:
         app.kubernetes.io/name: drogue-ajour
         app.kubernetes.io/instance: ajour
-        app.kubernetes.io/component: server
+        app.kubernetes.io/component: update-server
     spec:
       serviceAccountName: builder
       containers:
-      - name: server
-        image: ghcr.io/drogue-iot/drogue-ajour:latest
+      - name: update-server
+        image: ghcr.io/drogue-iot/drogue-ajour-update-server:latest
         imagePullPolicy: Always
         env:
           - name: RUST_LOG
-            value: drogue_ajour=debug
+            value: drogue_ajour_update_server=debug
           - name: OCI_REGISTRY_PREFIX
             valueFrom:
               secretKeyRef:

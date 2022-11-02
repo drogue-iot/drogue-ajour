@@ -1,0 +1,46 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: oras-push
+spec:
+  description: >-
+    ORAS (https://oras.land) task to push artifacts to a OCI registry.
+  params:
+    - description: Reference of the image oras will produce.
+      name: IMAGE
+      type: string
+    - default: >-
+        ghcr.io/oras-project/oras:v0.15.1
+      description: The location of the ORAS builder image.
+      name: BUILDER_IMAGE
+      type: string
+    - default: 'true'
+      description: >-
+        Verify the TLS on the registry endpoint (for push/pull to a non-TLS
+        registry)
+      name: TLSVERIFY
+      type: string
+    - default: ''
+      description: Extra parameters passed for the build command when building images.
+      name: BUILD_EXTRA_ARGS
+      type: string
+    - default: ''
+      description: Extra parameters passed for the push command when pushing images.
+      name: PUSH_EXTRA_ARGS
+      type: string
+    - description: Path to artifact to push.
+      name: ARTIFACT_PATH
+      type: string
+    - default: .
+      description: Path to the directory to use as context.
+      name: CONTEXT
+      type: string
+  steps:
+    - image: $(params.BUILDER_IMAGE)
+      name: push
+      resources: {}
+      script: |
+        cd $(params.CONTEXT) && oras push $(params.PUSH_EXTRA_ARGS) $(params.IMAGE) $(params.ARTIFACT_PATH):application/octet-stream
+      workingDir: $(workspaces.source.path)
+  workspaces:
+    - name: source
