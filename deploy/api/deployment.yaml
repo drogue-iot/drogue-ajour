@@ -20,16 +20,26 @@ spec:
         app.kubernetes.io/instance: ajour
         app.kubernetes.io/component: api
     spec:
+      serviceAccountName: pipeline
       containers:
       - name: server
         image: ghcr.io/drogue-iot/drogue-ajour-api:latest
         imagePullPolicy: Always
         env:
+          - name: RUST_LOG
+            value: debug
+          - name: NAMESPACE
+            value: drogue-ajour
+          - name: ALLOWED_APPLICATIONS
+            valueFrom:
+              secretKeyRef:
+                name: drogue-config
+                key: allowed-applications
           - name: DEVICE_REGISTRY
             valueFrom:
               secretKeyRef:
                 name: drogue-config
-                key: registry-url
+                key: api-url
         ports:
         - name: endpoint
           containerPort: 8080
