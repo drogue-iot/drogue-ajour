@@ -4,8 +4,7 @@ use ajour_schema::*;
 use anyhow::anyhow;
 pub use client::{ClientConfig, ClientProtocol};
 use lru::LruCache;
-use oci_distribution::{client, secrets::RegistryAuth};
-use serde_json::Value;
+use oci_distribution::{client, secrets::RegistryAuth, Reference};
 use std::io::Read;
 use tokio::time::{Duration, Instant};
 
@@ -66,23 +65,28 @@ impl OciClient {
                 }
             }
         }
-        let manifest = self
-            .client
-            .pull_manifest_and_config(&format!("{}{}", self.prefix, image).parse()?, &self.auth)
-            .await;
+        let imageref = format!("{}{}", self.prefix, image).parse()?;
+        let manifest = self.client.pull_image_manifest(&imageref, &self.auth).await;
         match manifest {
-            Ok((_, _, config)) => {
-                let val: Value = serde_json::from_str(&config)?;
-                if let Some(annotation) = val["config"]["Labels"]["io.drogue.metadata"].as_str() {
-                    let metadata: Metadata = serde_json::from_str(&annotation)?;
-                    self.metadata_cache
-                        .put(image.to_string(), (Instant::now(), metadata.clone()));
-                    Ok(Some(metadata))
-                } else {
-                    Err(anyhow!("Unable to locate metadata in image config"))
+            Ok((manifest, _)) => {
+                for layer in manifest.layers.iter() {
+                    if layer.media_type == "application/octet-stream" {
+                        let metadata: Metadata = Metadata {
+                            version: imageref.tag().unwrap_or("").as_bytes().to_vec(),
+                            checksum: layer.digest.clone(),
+                            size: layer.size as u32,
+                        };
+                        self.metadata_cache
+                            .put(image.to_string(), (Instant::now(), metadata.clone()));
+                        return Ok(Some(metadata));
+                    }
                 }
+                Err(anyhow!("Unable to locate metadata in image config"))
             }
-            Err(e) => Err(e),
+            Err(e) => {
+                log::info!("Error pulling manifest: {:?}", e);
+                Err(e.into())
+            }
         }
     }
 
@@ -99,43 +103,19 @@ impl OciClient {
             }
         }
 
+        let imageref: Reference = format!("{}{}", self.prefix, image).parse()?;
+        let mut payload = Vec::new();
         let manifest = self
             .client
-            .pull(
-                &format!("{}{}", self.prefix, image).parse()?,
-                &self.auth,
-                vec!["application/vnd.oci.image.layer.v1.tar+gzip"],
-            )
+            .pull_blob(&imageref, &metadata.checksum, &mut payload)
             .await;
         match manifest {
-            Ok(image) => {
-                let layer = &image.layers[0];
-                let mut decompressed = Vec::new();
-                let mut d = flate2::read::GzDecoder::new(&layer.data[..]);
-                d.read_to_end(&mut decompressed)?;
-
-                let mut archive = tar::Archive::new(&decompressed[..]);
-                let mut entries = archive.entries()?;
-                loop {
-                    if let Some(entry) = entries.next() {
-                        let mut entry = entry?;
-                        let path = entry.path()?;
-                        if let Some(p) = path.to_str() {
-                            if p == "firmware" {
-                                let mut payload = Vec::new();
-                                entry.read_to_end(&mut payload)?;
-                                self.firmware_cache
-                                    .put(metadata.checksum.clone(), payload.clone());
-                                return Ok(payload);
-                            }
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                Err(anyhow!("Error locating firmware"))
+            Ok(()) => {
+                self.firmware_cache
+                    .put(metadata.checksum.clone(), payload.clone());
+                return Ok(payload);
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e.into()),
         }
     }
 }

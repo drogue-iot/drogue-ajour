@@ -67,37 +67,19 @@ spec:
       workspaces:
         - name: input
           workspace: build
-    - name: firmware-bundle
-      params:
-        - name: PROJECT_PATH
-          value: $(params.PROJECT_PATH)
-        - name: BUNDLER_IMAGE
-          value: $(params.BUNDLER_IMAGE)
-        - name: ARTIFACT_PATH
-          value: $(params.ARTIFACT_PATH)
-      runAfter:
-        - firmware-build
-      taskRef:
-        kind: Task
-        name: firmware-bundle
-      workspaces:
-        - name: input
-          workspace: build
     - name: firmware-publish
       params:
         - name: IMAGE
           value: $(params.REGISTRY)/$(params.IMAGE)
-        - name: DOCKERFILE
-          value: $(workspaces.source.path)/$(params.PROJECT_PATH)/Dockerfile
+        - name: ARTIFACT_PATH
+          value: $(params.ARTIFACT_PATH)
         - name: CONTEXT
           value: $(workspaces.source.path)/$(params.PROJECT_PATH)
-        - name: BUILD_EXTRA_ARGS
-          value: --label io.drogue.metadata="`cat $(workspaces.source.path)/$(params.PROJECT_PATH)/firmware.json`"
       runAfter:
-        - firmware-bundle
+        - firmware-build
       taskRef:
-        kind: ClusterTask
-        name: buildah
+        kind: Task
+        name: oras-push
       workspaces:
         - name: source
           workspace: build

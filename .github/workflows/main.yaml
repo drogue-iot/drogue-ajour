@@ -33,7 +33,7 @@ jobs:
 
   publish-server:
     env:
-      IMAGE_NAME: drogue-ajour
+      IMAGE_NAME: drogue-ajour-update-server
     if: ${{github.head_ref == ''}} # only for non-PRs
     needs:
       - build

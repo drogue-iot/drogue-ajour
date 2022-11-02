@@ -126,6 +126,7 @@ async fn main() -> anyhow::Result<()> {
         log::info!("Enabling Container Registry");
         Some(oci::OciClient::new(
             oci::ClientConfig {
+                platform_resolver: None,
                 protocol: if args.oci_registry_tls {
                     oci::ClientProtocol::Https
                 } else {
