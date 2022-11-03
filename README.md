@@ -80,7 +80,7 @@ spec:
 
 ## Protocol
 
-Drogue Ajour uses a custom application level protocol sent on the 'dfu' channel and 'dfu' command to communicate with a device or gateway. The protocol is stateless, meaning that Drogue Ajour will track only send out firmware updates to devices that are reporting their status.
+Drogue Ajour uses a custom application level protocol sent on the 'dfu' channel and 'dfu' command to communicate with a device or gateway. The protocol is stateless, meaning that Drogue Ajour will only send out firmware updates to devices that are reporting their status.
 
 The protocol is designed so that devices do not have to be online continuously during the update, but can receive firmware at their own pace.
 
@@ -88,7 +88,7 @@ The protocol uses Consise Binary Object Representation (CBOR), to ensure a small
 
 A typical firmware update cycle runs as follows:
 
-1. At any given time, a device publishes message to the 'dfu' channel with the following payload
+1. At any given time, a device publishes a message to the 'dfu' channel with the following payload
 
 ```
 {
@@ -98,7 +98,7 @@ A typical firmware update cycle runs as follows:
 }
 ```
 
-This allows the Drogue Ajour to check if an update is necessary at all.
+This allows Drogue Ajour to check if an update is necessary at all.
 
 2. Drogue Ajour checks the desired firmware for that particular device and will attempt to locate it in the firmware registry.
 
@@ -126,7 +126,7 @@ This allows the Drogue Ajour to check if an update is necessary at all.
 }
 ```
 
-3c. If there is no new information about firmware, and server needs the client to wait before asking again, a 'wait' command is sent.
+3c. If there is no new information about the firmware, and server needs the client to wait before asking again, a 'wait' command is sent.
 
 ```
 {
@@ -136,9 +136,9 @@ This allows the Drogue Ajour to check if an update is necessary at all.
 }
 ```
 
-4a. When a device is seeing the "sync" operation, it should make sure it's current firmware version is marked as 'good' if it have not already done so. The 'poll' field can be used as a heuristic of how long the device should wait before checking in again.
+4a. When a device sees the "sync" operation, it should make sure it's current firmware version is marked as 'good' if it has not already done so. The 'poll' field can be used as a heuristic of how long the device should wait before checking in again.
 
-4b. When a device is seeing the "write" operation, it should write the provided data to it's storage. Once persisted, it should report back the next expected offset and last received version:
+4b. When a device sees the "write" operation, it should write the provided data to it's storage. Once persisted, it should report back the next expected offset and the last received version:
 
 ```
 {
@@ -151,7 +151,7 @@ This allows the Drogue Ajour to check if an update is necessary at all.
 }
 ```
 
-5b. When the server receives the next event from the device, it repeats step 4b. until the complete firmware have been sent. When the final block is confirmed written, and it is desired to deploy the new firmware, the fleet-manager will send the following command:
+5b. When the server receives the next event from the device, it repeats step 4b. until the complete firmware has been sent. When the final block is confirmed written, and it is desired to deploy the new firmware, the fleet-manager will send the following command:
 
 ```
 {
