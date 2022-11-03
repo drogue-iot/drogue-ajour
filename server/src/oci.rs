@@ -5,7 +5,6 @@ use anyhow::anyhow;
 pub use client::{ClientConfig, ClientProtocol};
 use lru::LruCache;
 use oci_distribution::{client, secrets::RegistryAuth, Reference};
-use std::io::Read;
 use tokio::time::{Duration, Instant};
 
 pub struct OciClient {
