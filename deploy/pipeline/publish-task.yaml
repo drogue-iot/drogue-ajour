@@ -10,7 +10,7 @@ spec:
       name: IMAGE
       type: string
     - default: >-
-        ghcr.io/oras-project/oras:v0.15.1
+        ghcr.io/oras-project/oras:v0.16.0
       description: The location of the ORAS builder image.
       name: BUILDER_IMAGE
       type: string
