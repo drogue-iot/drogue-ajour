@@ -26,10 +26,6 @@ spec:
     - name: BUILDER_IMAGE
       description: Firmware builder image
       type: string
-    - name: BUNDLER_IMAGE 
-      description: Firmware bundler image
-      type: string
-      default: image-registry.openshift-image-registry.svc:5000/drogue-ajour/firmware-bundler:latest
     - description: Firmware image name
       name: IMAGE
       type: string
