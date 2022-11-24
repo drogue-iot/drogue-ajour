@@ -56,7 +56,7 @@ impl Updater {
                         .await
                     } else {
                         let e = format!(
-                            "Device {}/{} requested container firwmare, but no container registry configured",
+                            "Device {}/{} requested container firmware, but no container registry configured",
                             application, device
                         );
                         log::warn!("{}", e);
@@ -70,7 +70,7 @@ impl Updater {
                             .await
                     } else {
                         let e = format!(
-                            "Device {}/{} requested Hawkbit firwmare, but no Hawkbit configured",
+                            "Device {}/{} requested Hawkbit firmware, but no Hawkbit configured",
                             application, device
                         );
                         log::warn!("{}", e);
@@ -82,7 +82,7 @@ impl Updater {
                         Self::process_update(f, index, application, device, &status, &name).await
                     } else {
                         let e = format!(
-                            "Device {}/{} requested firwmare from file, but no file registry configured",
+                            "Device {}/{} requested firmware from file, but no file registry configured",
                             application, device
                         );
                         log::warn!("{}", e);
