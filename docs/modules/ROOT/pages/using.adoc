@@ -1,8 +1,6 @@
 = User Guide
 
-If you are using an existing installation of Drogue Cloud, such as the link:https://sandbox.drogue.cloud[Drogue Cloud Sandbox], it might already have Drogue Ajour enabled.
-
-If not, have a look at the xref:installation[Admin Guide].
+To use Drogue Ajour you need to run a stand-alone version of Drogue Cloud. Have a look in the the xref:installation[Admin Guide] for installation instructions. The public link:https://sandbox.drogue.cloud[Drogue Cloud Sandbox] does not have Drogue Ajour installed.
 
 == Prerequisites
 * link:https://github.com/drogue-iot/drg[drg]
